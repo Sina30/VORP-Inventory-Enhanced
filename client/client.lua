@@ -8,6 +8,8 @@ AddEventHandler('onClientResourceStart', function(resourceName)
     end
 end)
 
+local CraftPeds = {}
+
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
     EnableHudContext(GetHashKey("HUD_CTX_MP_IN_ROLE_CUTSCENE"))
@@ -52,11 +54,113 @@ CreateThread(function()
     end
 end)
 
+local function getCraftInteractionCoords(loc)
+    if loc.ped and loc.ped.coords then
+        return loc.ped.coords
+    end
+
+    return loc.coord
+end
+
+local function spawnCraftPed(loc, index)
+    local pedConfig = loc.ped
+    if not pedConfig or pedConfig.enabled == false then
+        return
+    end
+
+    local coords = pedConfig.coords or loc.coord
+    if not coords then
+        print(("[vorp_inventory] Craft location %s is missing coords for ped spawn."):format(index))
+        return
+    end
+
+    local model = pedConfig.model or "U_M_M_NbxGeneralStoreOwner_01"
+    local modelHash = type(model) == "string" and joaat(model) or model
+    if not IsModelValid(modelHash) then
+        print(("[vorp_inventory] Invalid craft ped model at location %s: %s"):format(index, tostring(model)))
+        return
+    end
+
+    RequestModel(modelHash)
+    local timeout = 0
+    while not HasModelLoaded(modelHash) and timeout < 5000 do
+        Wait(50)
+        timeout = timeout + 50
+    end
+
+    if not HasModelLoaded(modelHash) then
+        print(("[vorp_inventory] Failed to load craft ped model at location %s: %s"):format(index, tostring(model)))
+        return
+    end
+
+    local heading = pedConfig.heading or 0.0
+    local ped
+
+    local ok = pcall(function()
+        ped = CreatePed(modelHash, coords.x, coords.y, coords.z - 1.0, heading, false, true, true, true)
+    end)
+
+    if not ok or not ped or ped == 0 then
+        pcall(function()
+            ped = CreatePed(0, modelHash, coords.x, coords.y, coords.z - 1.0, heading, false, true, true, true)
+        end)
+    end
+
+    if not ped or ped == 0 then
+        print(("[vorp_inventory] Failed to create craft ped at location %s."):format(index))
+        SetModelAsNoLongerNeeded(modelHash)
+        return
+    end
+
+    SetEntityAsMissionEntity(ped, true, true)
+    SetEntityInvincible(ped, true)
+    FreezeEntityPosition(ped, true)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+
+    if pedConfig.scenario and pedConfig.scenario ~= "" then
+        local scenarioStarted = pcall(function()
+            TaskStartScenarioInPlace(ped, pedConfig.scenario, -1, true, false, false, false)
+        end)
+
+        if not scenarioStarted then
+            pcall(function()
+                TaskStartScenarioInPlace(ped, joaat(pedConfig.scenario), -1, true, false, false, false)
+            end)
+        end
+    else
+        TaskStandStill(ped, -1)
+    end
+
+    CraftPeds[index] = ped
+    SetModelAsNoLongerNeeded(modelHash)
+end
+
+local function cleanupCraftPeds()
+    for index, ped in pairs(CraftPeds) do
+        if ped and DoesEntityExist(ped) then
+            pcall(DeletePed, ped)
+            if DoesEntityExist(ped) then
+                DeleteEntity(ped)
+            end
+        end
+        CraftPeds[index] = nil
+    end
+end
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if GetCurrentResourceName() ~= resourceName then return end
+    cleanupCraftPeds()
+end)
+
 -- Craft locations prompt system
 CreateThread(function()
     if not Config.CraftLocations or #Config.CraftLocations == 0 then return end
 
     repeat Wait(2000) until LocalPlayer.state.IsInSession
+
+    for index, loc in ipairs(Config.CraftLocations) do
+        spawnCraftPed(loc, index)
+    end
 
     local craftGroup = GetRandomIntInRange(0, 0xffffff)
     local craftPrompt = UiPromptRegisterBegin()
@@ -72,15 +176,15 @@ CreateThread(function()
         local sleep = 1000
         local playerPed = PlayerPedId()
         local playerCoords = GetEntityCoords(playerPed, true, true)
-        local nearCraft = false
 
         for _, loc in ipairs(Config.CraftLocations) do
-            local dist = #(playerCoords - loc.coord)
-            if dist <= 2.0 then
-                nearCraft = true
+            local interactCoords = getCraftInteractionCoords(loc)
+            local interactDistance = loc.interactDistance or 2.0
+            local dist = #(playerCoords - interactCoords)
+            if dist <= interactDistance then
                 sleep = 0
 
-                local label = CreateVarString(10, "LITERAL_STRING", "Craft Station")
+                local label = CreateVarString(10, "LITERAL_STRING", loc.label or "Craft Station")
                 UiPromptSetActiveGroupThisFrame(craftGroup, label, 0, 0, 0, 0)
 
                 if UiPromptHasHoldModeCompleted(craftPrompt) then
@@ -314,4 +418,3 @@ CreateThread(function()
         Wait(sleep)
     end
 end)
-
