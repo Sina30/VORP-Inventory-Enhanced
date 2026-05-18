@@ -4,6 +4,26 @@ exports('closeInventory', function()
     return NUIService.CloseInv()
 end)
 
+exports('openInventory', function()
+    return NUIService.OpenInv()
+end)
+
+exports('toggleInventory', function()
+    if InInventory then
+        return NUIService.CloseInv()
+    end
+
+    return NUIService.OpenInv()
+end)
+
+exports('isInventoryOpen', function()
+    return InInventory == true
+end)
+
+exports('setInventoryDisabled', function(state)
+    return NUIService.DisableInventory(state == true)
+end)
+
 exports('getWeaponDefaultWeight', function(hash)
     return Utils.GetWeaponDefaultWeight(hash)
 end)
