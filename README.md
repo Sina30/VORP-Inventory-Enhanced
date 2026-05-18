@@ -17,7 +17,6 @@ This project is an enhancement of the VORP inventory ecosystem. It is not presen
 ## Preview and Docs
 - Video: [YouTube](https://youtu.be/pvwEyYEfvvI)
 - Docs: [Link](https://coderanch-redm-store.gitbook.io/coderanch-redm-store-docs/coderanch-vorp_inventory)
-- Discord: [Link](https://discord.gg/Nmeyunxtfq)
 
 ## What This Resource Includes
 
