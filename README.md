@@ -14,6 +14,11 @@ This repository keeps the VORP inventory foundation, extends it with new gamepla
 
 This project is an enhancement of the VORP inventory ecosystem. It is not presented as a replacement for the original authorship.
 
+## Preview and Docs
+- Video: [YouTube](https://youtu.be/pvwEyYEfvvI)
+- Docs: [Link](https://coderanch-redm-store.gitbook.io/coderanch-redm-store-docs/coderanch-vorp_inventory)
+- Discord: [Link](https://discord.gg/Nmeyunxtfq)
+
 ## What This Resource Includes
 
 - Player inventory with items, weapons, money, gold, and ammo support
