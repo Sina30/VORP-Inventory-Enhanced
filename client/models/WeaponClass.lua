@@ -30,6 +30,14 @@ end
 
 local equippedWeapons = {}
 
+local function removeEquippedWeaponById(id)
+	for i = #equippedWeapons, 1, -1 do
+		if equippedWeapons[i].id == id then
+			table.remove(equippedWeapons, i)
+		end
+	end
+end
+
 local function getGuidFromItemId(inventoryId, itemData, category, slotId)
 	local outItem = DataView.ArrayBuffer(8 * 13)
 	local success = Citizen.InvokeNative(0x886DFD3E185C8A89, inventoryId, itemData and itemData or 0, category, slotId,
@@ -47,6 +55,10 @@ local function moveInventoryItem(inventoryId, old, new, slot)
 end
 
 local function addWeapon(weapon, slot, id)
+	if id then
+		removeEquippedWeaponById(id)
+	end
+
 	if slot == 0 and id then
 		if #equippedWeapons > 0 then
 			slot = 1
@@ -167,6 +179,11 @@ function Weapon:RemoveWeaponFromPed()
 		end
 		moveInventoryItem(inventoryId, equippedWeapons[1].guid, weaponItem:Buffer(), 0)
 		Citizen.InvokeNative(0x12FB95FE3D579238, playerPedId, equippedWeapons[1].guid, true, 0, false, false)
+		local remainingWeapon = UserWeapons[equippedWeapons[1].id]
+		if remainingWeapon then
+			remainingWeapon:setUsed2(false)
+			remainingWeapon:setUsed(true)
+		end
 	else
 		RemoveWeaponFromPed(playerPedId, joaat(self.name), true, 0)
 	end
