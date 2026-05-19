@@ -39,6 +39,7 @@ end
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
     local hotbarControls = {
+        0xB238FE0B,
         0xE6F612E4,
         0x1CE6D9EB,
         0xAE69478F,
@@ -50,7 +51,7 @@ CreateThread(function()
         for _, control in ipairs(hotbarControls) do
             DisableControlAction(0, control, true)
         end
-        if IsControlJustPressed(0, 0xB238FE0B) then
+        if IsDisabledControlJustPressed(0, 0xB238FE0B) then
            
             NUIService.SendHotbarItems()
             SendNUIMessage({ action = "toggleHotbar" })
