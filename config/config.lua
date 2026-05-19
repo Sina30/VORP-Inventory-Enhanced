@@ -39,6 +39,8 @@ Config = {
 
 	OpenKey                        = 0xC1989F95, -- I
 
+	HolsterKey                     = 0x26E9DC00, -- Z by default. Change this to another RedM control hash if needed.
+
 	discordid                      = true,    -- Turn to true if ur using discord whitelist
 
 	DeleteOnlyDontDrop             = false,   -- If true then dropping items only deletes from inventory and box on the floor is not created

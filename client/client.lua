@@ -9,6 +9,27 @@ AddEventHandler('onClientResourceStart', function(resourceName)
 end)
 
 local CraftPeds = {}
+local lastHolsteredWeapon = nil
+
+local function toggleHolsterWeapon()
+    local ped = PlayerPedId()
+    local _, weaponHash = GetCurrentPedWeapon(ped, false, 0, false)
+    if not weaponHash or weaponHash == 0 or weaponHash == `WEAPON_UNARMED` then
+        weaponHash = GetPedCurrentHeldWeapon(ped)
+    end
+
+    if not weaponHash or weaponHash == 0 or weaponHash == `WEAPON_UNARMED` then
+        if lastHolsteredWeapon and lastHolsteredWeapon ~= 0 and lastHolsteredWeapon ~= `WEAPON_UNARMED` then
+            SetCurrentPedWeapon(ped, lastHolsteredWeapon, false, 0, false, false)
+            return true
+        end
+        return false
+    end
+
+    lastHolsteredWeapon = weaponHash
+    SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true, 0, false, false)
+    return true
+end
 
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
@@ -38,8 +59,11 @@ end
 -- Hotbar toggle with Tab
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
+    local tabControl = 0xB238FE0B
+    local holsterControl = Config.HolsterKey
     local hotbarControls = {
-        0xB238FE0B,
+        tabControl,
+        holsterControl,
         0xE6F612E4,
         0x1CE6D9EB,
         0xAE69478F,
@@ -49,14 +73,21 @@ CreateThread(function()
     while true do
         Wait(0)
         for _, control in ipairs(hotbarControls) do
-            DisableControlAction(0, control, true)
+            if control then
+                DisableControlAction(0, control, true)
+            end
         end
-        if IsDisabledControlJustPressed(0, 0xB238FE0B) then
-           
+
+        if IsDisabledControlJustPressed(0, tabControl) then
             NUIService.SendHotbarItems()
             SendNUIMessage({ action = "toggleHotbar" })
         end
+
         if not InInventory then
+            if holsterControl and IsDisabledControlJustPressed(0, holsterControl) then
+                toggleHolsterWeapon()
+            end
+
             if IsDisabledControlJustPressed(0, 0xE6F612E4) then NUIService.UseHotbarSlot(1)
             elseif IsDisabledControlJustPressed(0, 0x1CE6D9EB) then NUIService.UseHotbarSlot(2)
             elseif IsDisabledControlJustPressed(0, 0xAE69478F) then NUIService.UseHotbarSlot(3)

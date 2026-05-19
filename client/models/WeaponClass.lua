@@ -64,12 +64,14 @@ local function addWeapon(weapon, slot, id)
 			slot = 1
 		end
 	end
+	if slot == 1 and id and #equippedWeapons == 0 then
+		slot = 0
+	end
 	local weaponHash  = joaat(weapon)
 	local sHash       = "SLOTID_WEAPON_" .. tostring(slot)
 	local reason      = joaat("ADD_REASON_DEFAULT")
 	local inventoryId = 1
 	local slotHash    = joaat(sHash)
-	local move        = false
 	local playerPedId = PlayerPedId()
 
 	--Now add it to the characters inventory
@@ -91,23 +93,6 @@ local function addWeapon(weapon, slot, id)
 		return false
 	end
 
-	if slot == 1 and id then
-		if #equippedWeapons > 0 then
-			--local newItemData = DataView.ArrayBuffer(8 * 13)
-			local newGUID = moveInventoryItem(inventoryId, equippedWeapons[1].guid, weaponItem:Buffer())
-			if not newGUID then
-				print("can't move item")
-				return false
-			end
-			slotHash = joaat('SLOTID_WEAPON_0')
-			slot = 0
-			move = true
-		else
-			slotHash = joaat('SLOTID_WEAPON_0')
-			slot = 0
-		end
-	end
-
 	local itemData = DataView.ArrayBuffer(8 * 13)
 	local isAdded = Citizen.InvokeNative(0xCB5D11F9508A928D, inventoryId, itemData:Buffer(), weaponItem:Buffer(), weaponHash, slotHash, 1, reason) --Actually add the item now
 	if not isAdded then
@@ -122,10 +107,6 @@ local function addWeapon(weapon, slot, id)
 	end
 
 	Citizen.InvokeNative(0x12FB95FE3D579238, playerPedId, itemData:Buffer(), true, slot, false, false)
-	if move then
-		Citizen.InvokeNative(0x12FB95FE3D579238, playerPedId, equippedWeapons[1].guid, true, 1, false, false)
-		TriggerServerEvent("syn_weapons:applyDupeTint", id, itemData:Buffer(), weaponHash)
-	end
 	if id then
 		local nWeapon = {
 			id = id,
