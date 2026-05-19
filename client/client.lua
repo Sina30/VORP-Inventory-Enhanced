@@ -55,11 +55,13 @@ CreateThread(function()
             NUIService.SendHotbarItems()
             SendNUIMessage({ action = "toggleHotbar" })
         end
-        if IsDisabledControlJustPressed(0, 0xE6F612E4) then NUIService.UseHotbarSlot(1)
-        elseif IsDisabledControlJustPressed(0, 0x1CE6D9EB) then NUIService.UseHotbarSlot(2)
-        elseif IsDisabledControlJustPressed(0, 0xAE69478F) then NUIService.UseHotbarSlot(3)
-        elseif IsDisabledControlJustPressed(0, 0x8F9F9E58) then NUIService.UseHotbarSlot(4)
-        elseif IsDisabledControlJustPressed(0, 0xAB62E997) then NUIService.UseHotbarSlot(5)
+        if not InInventory then
+            if IsDisabledControlJustPressed(0, 0xE6F612E4) then NUIService.UseHotbarSlot(1)
+            elseif IsDisabledControlJustPressed(0, 0x1CE6D9EB) then NUIService.UseHotbarSlot(2)
+            elseif IsDisabledControlJustPressed(0, 0xAE69478F) then NUIService.UseHotbarSlot(3)
+            elseif IsDisabledControlJustPressed(0, 0x8F9F9E58) then NUIService.UseHotbarSlot(4)
+            elseif IsDisabledControlJustPressed(0, 0xAB62E997) then NUIService.UseHotbarSlot(5)
+            end
         end
     end
 end)
