@@ -333,7 +333,7 @@
     if (dragSource.value !== 'player') { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
     var item = inventory.getItemAtSlot(dragFrom.value)
     if (!item) { dragFrom.value = null; dragGhost.value.show = false; return }
-    if (item.locked) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
+    if (item.locked && item.type !== 'item_money' && item.type !== 'item_gold') { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
 
     var amount = transferAmount.value
     if (!amount || amount <= 0 || amount > item.count) amount = item.count
