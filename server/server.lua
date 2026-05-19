@@ -4,6 +4,33 @@ if Config.DevMode then
     print("^1[DEV] ^7DEV MODE IS ENABLED, THIS IS NOT FOR PRODUCTION SERVERS")
 end
 
+local DropInUse = {} -- [dropId] = sourceServerId
+local RepairingWeapons = {}
+local StealTargets = {} -- [sourceServerId] = targetServerId
+
+local function getCharacterDisplayName(character)
+    if not character then return "" end
+    local firstName = character.firstname or character.FirstName or ""
+    local lastName = character.lastname or character.LastName or ""
+    local name = (tostring(firstName) .. " " .. tostring(lastName)):gsub("^%s+", ""):gsub("%s+$", "")
+    return name ~= "" and name or "Unknown"
+end
+
+local function canStackInventoryItems(firstItem, secondItem)
+    if not firstItem or not secondItem then return false end
+    if firstItem:getName() ~= secondItem:getName() then return false end
+    if not SharedUtils.Table_equals(firstItem:getMetadata() or {}, secondItem:getMetadata() or {}, true) then return false end
+
+    local firstMax = firstItem:getMaxDegradation() or 0
+    local secondMax = secondItem:getMaxDegradation() or 0
+    if firstMax ~= secondMax then return false end
+    if firstMax > 0 then
+        return firstItem:getPercentage() == secondItem:getPercentage() and firstItem:getDegradation() == secondItem:getDegradation()
+    end
+
+    return true
+end
+
 -- Auto migration: slot columns
 CreateThread(function()
     local migrations = {
@@ -156,9 +183,6 @@ AddEventHandler('playerDropped', function()
     end
 end)
 
--- Drop inventory lock system
-local DropInUse = {} -- [dropId] = sourceServerId
-
 RegisterServerEvent("vorpinventory:lockDrop", function(dropId)
     local _source = source
     if not dropId then return end
@@ -199,7 +223,7 @@ Core.Callback.Register("vorpinventory:get_slots", function(source, cb, _)
         money = character.money,
         gold = character.gold,
         rol = character.rol,
-        charName = character.firstname .. " " .. character.lastname,
+        charName = getCharacterDisplayName(character),
     })
 end)
 
@@ -222,9 +246,6 @@ RegisterServerEvent("vorp_inventory:Server:CloseCustomInventory", function()
     CustomInventoryInfos[id]:setInUse(false)
     INVENTORY_IN_USE[_source] = nil
 end)
-
--- Weapon repair system
-local RepairingWeapons = {}
 
 RegisterServerEvent("vorpinventory:repairWeapon", function(weaponId, repairTime)
     local _source = source
@@ -317,9 +338,6 @@ RegisterServerEvent("vorpinventory:updateWeaponDurability", function(weaponId, d
     weapon:setDurability(durability)
 end)
 
--- Steal: open target player's inventory
-local StealTargets = {} -- [sourceServerId] = targetServerId
-
 local function refreshStealInventory(_source, targetServerId)
     local targetUser = Core.getUser(targetServerId)
     if not targetUser then return end
@@ -364,7 +382,7 @@ RegisterServerEvent("vorpinventory:stealPlayer", function(targetServerId)
     if not sourceUser then return end
 
     local targetChar = targetUser.getUsedCharacter
-    local targetName = targetChar.firstname .. " " .. targetChar.lastname
+    local targetName = getCharacterDisplayName(targetChar)
     local capacity = targetChar.invCapacity or 200
 
     StealTargets[_source] = targetServerId
@@ -451,7 +469,7 @@ RegisterServerEvent("syn_search:TakeFromsteal", function(dataJson)
         local existingItem = nil
         if sourceInv then
             for _, it in pairs(sourceInv) do
-                if it:getSlot() == targetSlot and it:getName() == invItem:getName() then
+                if it:getSlot() == targetSlot and canStackInventoryItems(it, invItem) then
                     existingItem = it
                     break
                 end
@@ -477,13 +495,14 @@ RegisterServerEvent("syn_search:TakeFromsteal", function(dataJson)
             -- Create new item at target slot
             local svItem = ServerItems[itemName]
             if svItem then
-                DBService.CreateItem(sourceCharId, svItem:getId(), amount, invItem:getMetadata() or {}, itemName, nil, function(result)
+                DBService.CreateItem(sourceCharId, svItem:getId(), amount, invItem:getMetadata() or {}, itemName, invItem:getDegradation() or 0, function(result)
                     if result and result.id then
                         local newItem = Item:New({
                             count = amount, id = result.id, limit = svItem.limit, label = svItem.label,
                             metadata = invItem:getMetadata() or {}, name = itemName, type = svItem.type,
                             canUse = svItem.canUse, canRemove = svItem.canRemove, owner = sourceCharId,
                             desc = svItem.desc, group = svItem.group, weight = svItem.weight,
+                            degradation = invItem:getDegradation(), percentage = invItem:getPercentage(),
                             maxDegradation = svItem.maxDegradation, slot = targetSlot,
                         })
                         if not UsersInventories.default[sourceIdentifier] then UsersInventories.default[sourceIdentifier] = {} end
@@ -559,7 +578,7 @@ RegisterServerEvent("syn_search:MoveTosteal", function(dataJson)
         local existingItem = nil
         if targetInv then
             for _, it in pairs(targetInv) do
-                if it:getSlot() == targetSlot and it:getName() == invItem:getName() then
+                if it:getSlot() == targetSlot and canStackInventoryItems(it, invItem) then
                     existingItem = it
                     break
                 end
@@ -584,13 +603,14 @@ RegisterServerEvent("syn_search:MoveTosteal", function(dataJson)
         else
             local svItem = ServerItems[itemName]
             if svItem then
-                DBService.CreateItem(targetCharId, svItem:getId(), amount, invItem:getMetadata() or {}, itemName, nil, function(result)
+                DBService.CreateItem(targetCharId, svItem:getId(), amount, invItem:getMetadata() or {}, itemName, invItem:getDegradation() or 0, function(result)
                     if result and result.id then
                         local newItem = Item:New({
                             count = amount, id = result.id, limit = svItem.limit, label = svItem.label,
                             metadata = invItem:getMetadata() or {}, name = itemName, type = svItem.type,
                             canUse = svItem.canUse, canRemove = svItem.canRemove, owner = targetCharId,
                             desc = svItem.desc, group = svItem.group, weight = svItem.weight,
+                            degradation = invItem:getDegradation(), percentage = invItem:getPercentage(),
                             maxDegradation = svItem.maxDegradation, slot = targetSlot,
                         })
                         if not UsersInventories.default[targetIdentifier] then UsersInventories.default[targetIdentifier] = {} end
@@ -761,7 +781,7 @@ RegisterServerEvent("vorpinventory:stealMergeSlot", function(fromSlot, toSlot, a
         if it:getSlot() == fromSlot then fromItem = it end
         if it:getSlot() == toSlot then toItem = it end
     end
-    if not fromItem or not toItem or fromItem:getName() ~= toItem:getName() then return end
+    if not canStackInventoryItems(fromItem, toItem) then return end
 
     amount = tonumber(amount) or fromItem:getCount()
     if amount > fromItem:getCount() then amount = fromItem:getCount() end

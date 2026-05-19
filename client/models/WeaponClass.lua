@@ -222,7 +222,7 @@ function Weapon:equipwep()
 			if isWeaponAGun and isWeaponOneHanded then
 				addWeapon(self.name, 0, self.id)
 			else
-				GiveWeaponToPed(playerPedId, weaponHash_0, ammoCount, true, true, 2, false, 0.5, 1.0, 752097756, false, 0, false)
+				GiveWeaponToPed(playerPedId, weaponHash_0, ammoCount, true, true, 3, false, 0.5, 1.0, 752097756, false, 0, false)
 				SetCurrentPedWeapon(playerPedId, weaponHash_0, false, 0, false, false)
 			end
 		end

@@ -25,6 +25,30 @@ function assignSlots(itemList) {
   return result
 }
 
+function normalizedMetadata(item) {
+  var metadata = item && item.metadata ? item.metadata : {}
+  var keys = Object.keys(metadata).sort()
+  var normalized = {}
+  for (var i = 0; i < keys.length; i++) {
+    normalized[keys[i]] = metadata[keys[i]]
+  }
+  return JSON.stringify(normalized)
+}
+
+function canStackItems(a, b) {
+  if (!a || !b) return false
+  if (a.name !== b.name || a.type === 'item_weapon' || b.type === 'item_weapon') return false
+  if (normalizedMetadata(a) !== normalizedMetadata(b)) return false
+
+  var aMax = Number(a.maxDegradation) || 0
+  var bMax = Number(b.maxDegradation) || 0
+  if (aMax !== bMax) return false
+  if (aMax > 0) {
+    return Number(a.percentage) === Number(b.percentage) && Number(a.degradation) === Number(b.degradation)
+  }
+  return true
+}
+
 export const useInventoryStore = defineStore('inventory', () => {
   const items = ref([])
   const playerInventory = ref([])
@@ -404,7 +428,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     }
 
     // Same item: merge
-    if (toItem && toItem.name === fromItem.name && toItem.type !== 'item_weapon') {
+    if (canStackItems(fromItem, toItem)) {
       postNUI('SecondMergeSlot', { invId: iId, fromSlot: fromSlot, toSlot: toSlot, amount: moveAmount })
       return
     }
@@ -435,7 +459,7 @@ export const useInventoryStore = defineStore('inventory', () => {
       postNUI('StealSwapSlot', { fromSlot: fromSlot, toSlot: toSlot })
       return
     }
-    if (toItem && toItem.name === fromItem.name && toItem.type !== 'item_weapon') {
+    if (canStackItems(fromItem, toItem)) {
       postNUI('StealMergeSlot', { fromSlot: fromSlot, toSlot: toSlot, amount: moveAmount })
       return
     }
@@ -469,7 +493,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     }
 
     // Same item at target: merge
-    if (toItem && toItem.name === fromItem.name && toItem.type !== 'item_weapon') {
+    if (canStackItems(fromItem, toItem)) {
       postNUI('DropMergeSlot', { dropId: dId, fromSlot: fromSlot, toSlot: toSlot, amount: moveAmount })
       return
     }
@@ -520,7 +544,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     }
 
     // Same item at target: stack
-    if (toItem && toItem.name === fromItem.name && toItem.type !== 'item_weapon') {
+    if (canStackItems(fromItem, toItem)) {
       toItem.count = toItem.count + moveAmount
       fromItem.count = fromItem.count - moveAmount
       if (fromItem.count <= 0) {

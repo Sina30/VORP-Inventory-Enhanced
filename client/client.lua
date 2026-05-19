@@ -38,18 +38,28 @@ end
 -- Hotbar toggle with Tab
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
+    local hotbarControls = {
+        0xE6F612E4,
+        0x1CE6D9EB,
+        0xAE69478F,
+        0x8F9F9E58,
+        0xAB62E997,
+    }
     while true do
         Wait(0)
+        for _, control in ipairs(hotbarControls) do
+            DisableControlAction(0, control, true)
+        end
         if IsControlJustPressed(0, 0xB238FE0B) then
            
             NUIService.SendHotbarItems()
             SendNUIMessage({ action = "toggleHotbar" })
         end
-        if IsControlJustPressed(0, 0xE6F612E4) then NUIService.UseHotbarSlot(1)
-        elseif IsControlJustPressed(0, 0x1CE6D9EB) then NUIService.UseHotbarSlot(2)
-        elseif IsControlJustPressed(0, 0xAE69478F) then NUIService.UseHotbarSlot(3)
-        elseif IsControlJustPressed(0, 0x8F9F9E58) then NUIService.UseHotbarSlot(4)
-        elseif IsControlJustPressed(0, 0xAB62E997) then NUIService.UseHotbarSlot(5)
+        if IsDisabledControlJustPressed(0, 0xE6F612E4) then NUIService.UseHotbarSlot(1)
+        elseif IsDisabledControlJustPressed(0, 0x1CE6D9EB) then NUIService.UseHotbarSlot(2)
+        elseif IsDisabledControlJustPressed(0, 0xAE69478F) then NUIService.UseHotbarSlot(3)
+        elseif IsDisabledControlJustPressed(0, 0x8F9F9E58) then NUIService.UseHotbarSlot(4)
+        elseif IsDisabledControlJustPressed(0, 0xAB62E997) then NUIService.UseHotbarSlot(5)
         end
     end
 end)

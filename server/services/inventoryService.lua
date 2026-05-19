@@ -248,7 +248,9 @@ function InventoryService.PickupFromDrop(dropId, fromSlot, targetSlot, amount, n
 	local targetItem = nil
 	if inv then
 		for _, item in pairs(inv) do
-			if item:getSlot() == targetSlot and item:getName() == name and item:getType() ~= "item_weapon" then
+			if item:getSlot() == targetSlot and item:getName() == name and item:getType() ~= "item_weapon"
+				and SharedUtils.Table_equals(item:getMetadata() or {}, metadata or {}, true)
+				and (item:getDegradation() or 0) == (degradation or 0) then
 				targetItem = item
 				break
 			end
@@ -333,6 +335,28 @@ local function findItemAtSlot(inv, slot)
 	return nil, nil
 end
 
+local function canStackInventoryItems(firstItem, secondItem)
+	if not firstItem or not secondItem then return false end
+	if firstItem:getName() ~= secondItem:getName() then return false end
+	if not SharedUtils.Table_equals(firstItem:getMetadata() or {}, secondItem:getMetadata() or {}, true) then return false end
+
+	local firstMax = firstItem:getMaxDegradation() or 0
+	local secondMax = secondItem:getMaxDegradation() or 0
+	if firstMax ~= secondMax then return false end
+	if firstMax > 0 then
+		return firstItem:getPercentage() == secondItem:getPercentage() and firstItem:getDegradation() == secondItem:getDegradation()
+	end
+
+	return true
+end
+
+local function canStackDropItems(firstItem, secondItem)
+	if not firstItem or not secondItem then return false end
+	if firstItem.name ~= secondItem.name then return false end
+	if not SharedUtils.Table_equals(firstItem.metadata or {}, secondItem.metadata or {}, true) then return false end
+	return (firstItem.degradation or 0) == (secondItem.degradation or 0)
+end
+
 function InventoryService.SecondSwapSlot(invId, fromSlot, toSlot)
 	local _source = source
 	local inv = getCustomInvItems(_source, invId)
@@ -359,7 +383,7 @@ function InventoryService.SecondMergeSlot(invId, fromSlot, toSlot, amount)
 	local fromId, fromItem = findItemAtSlot(inv, fromSlot)
 	local toId, toItem = findItemAtSlot(inv, toSlot)
 	if not fromItem or not toItem then return end
-	if fromItem:getName() ~= toItem:getName() then return end
+	if not canStackInventoryItems(fromItem, toItem) then return end
 	local user = Core.getUser(_source)
 	local charId = user.getUsedCharacter.charIdentifier
 
@@ -412,6 +436,9 @@ function InventoryService.SecondSplitSlot(invId, fromSlot, toSlot, amount)
 				desc = svItem.desc,
 				group = svItem.group,
 				weight = svItem.weight,
+				degradation = fromItem:getDegradation(),
+				percentage = fromItem:getPercentage(),
+				maxDegradation = svItem.maxDegradation,
 				slot = toSlot,
 			})
 			inv[result.id] = newItem
@@ -440,7 +467,7 @@ function InventoryService.DropMergeSlot(dropId, fromSlot, toSlot, amount)
 	local fromData = loc.slots[fromSlot]
 	local toData = loc.slots[toSlot]
 	if not fromData or not toData then return end
-	if fromData.name ~= toData.name then return end
+	if not canStackDropItems(fromData, toData) then return end
 
 	local moveAmount = math.min(amount, fromData.amount)
 	toData.amount = toData.amount + moveAmount
@@ -474,6 +501,8 @@ function InventoryService.DropSplitSlot(dropId, fromSlot, toSlot, amount)
 		amount = moveAmount,
 		weight = fromData.weight,
 		type = fromData.type,
+		metadata = fromData.metadata,
+		degradation = fromData.degradation,
 		isMoney = fromData.isMoney,
 		isGold = fromData.isGold,
 		uuid = fromData.uuid,
@@ -607,6 +636,11 @@ end
 function InventoryService.giveMoneyToPlayer(target, amount)
 	local _source <const> = source
 	local _target <const> = target
+	amount = tonumber(amount)
+	if not amount or amount <= 0 then
+		return TriggerClientEvent("vorp_inventory:ProcessingReady", _source)
+	end
+	amount = math.floor(amount * 100) / 100
 	local user <const> = Core.getUser(_source)
 	local targetUser <const> = Core.getUser(_target)
 
@@ -678,6 +712,11 @@ end
 
 function InventoryService.giveGoldToPlayer(target, amount)
 	local _source <const> = source
+	amount = tonumber(amount)
+	if not amount or amount <= 0 then
+		return TriggerClientEvent("vorp_inventory:ProcessingReady", _source)
+	end
+	amount = math.floor(amount * 100) / 100
 
 	local user <const> = Core.getUser(_source)
 	local targetUser <const> = Core.getUser(target)
@@ -735,7 +774,7 @@ function InventoryService.MergeSlots(fromId, toId, amount)
 	local fromItem = inv[tonumber(fromId)]
 	local toItem = inv[tonumber(toId)]
 	if not fromItem or not toItem then return end
-	if fromItem:getName() ~= toItem:getName() then return end
+	if not canStackInventoryItems(fromItem, toItem) then return end
 
 	local moveAmount = math.min(amount, fromItem:getCount())
 	toItem:addCount(moveAmount, true)

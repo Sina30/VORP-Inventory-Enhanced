@@ -29,13 +29,51 @@
   }
 
   function slotCount(item) {
-    return item.type === 'item_weapon' ? 1 : item.count
+    if (item.type === 'item_weapon') return '1x'
+    if (item.type === 'item_money' || item.type === 'item_gold') return formatCurrencyAmount(item.count)
+    return Math.floor(Number(item.count) || 0) + 'x'
   }
 
   function slotWeight(item) {
     var w = item.weight || 0
     var c = item.type === 'item_weapon' ? 1 : item.count
     return (w * c).toFixed(2)
+  }
+
+  function formatCurrencyAmount(value) {
+    return (Number(value) || 0).toFixed(2)
+  }
+
+  function isCurrencyItem(item) {
+    return item && (item.type === 'item_money' || item.type === 'item_gold')
+  }
+
+  function getTransferAmount(item) {
+    var amount = Number(transferAmount.value)
+    var max = Number(item.count) || 0
+    if (!amount || amount <= 0) amount = max
+    if (amount > max) amount = max
+    if (isCurrencyItem(item)) return Math.floor(amount * 100) / 100
+    return Math.max(1, Math.floor(amount))
+  }
+
+  function normalizedMetadata(item) {
+    var metadata = item && item.metadata ? item.metadata : {}
+    var keys = Object.keys(metadata).sort()
+    var normalized = {}
+    for (var i = 0; i < keys.length; i++) normalized[keys[i]] = metadata[keys[i]]
+    return JSON.stringify(normalized)
+  }
+
+  function canStackItems(a, b) {
+    if (!a || !b) return false
+    if (a.name !== b.name || a.type === 'item_weapon' || b.type === 'item_weapon') return false
+    if (normalizedMetadata(a) !== normalizedMetadata(b)) return false
+    var aMax = Number(a.maxDegradation) || 0
+    var bMax = Number(b.maxDegradation) || 0
+    if (aMax !== bMax) return false
+    if (aMax > 0) return Number(a.percentage) === Number(b.percentage) && Number(a.degradation) === Number(b.degradation)
+    return true
   }
 
   const contextMenu = ref({ show: false, x: 0, y: 0, item: null })
@@ -142,8 +180,7 @@
     if (item.type === 'item_weapon' && (item.used || item.used2)) {
       postNUI('UnequipWeapon', { item: item.name, id: item.id })
     } else {
-      var useAmt = transferAmount.value
-      if (!useAmt || useAmt <= 0 || useAmt > item.count) useAmt = item.count
+      var useAmt = getTransferAmount(item)
       postNUI('UseItem', { item: item.name, type: item.type, hash: item.hash, amount: useAmt, id: item.id })
     }
   }
@@ -189,10 +226,9 @@
       if (dropItem) {
         // Block if target slot has different item
         var targetPlayerItem = inventory.getItemAtSlot(toSlot)
-        if (targetPlayerItem && targetPlayerItem.name !== dropItem.name) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
+        if (targetPlayerItem && !canStackItems(dropItem, targetPlayerItem)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
 
-        var amount = transferAmount.value
-        if (!amount || amount <= 0 || amount > dropItem.amount) amount = dropItem.amount
+        var amount = getTransferAmount(Object.assign({}, dropItem, { count: dropItem.amount }))
 
         postNUI('PickupFromDrop', {
           dropId: inventory.nearbyDropId,
@@ -219,17 +255,16 @@
       if (secItem) {
         var targetPlayerItem2 = inventory.getItemAtSlot(toSlot)
         // Steal: swap when different items
-        if (inventory.invType === 'steal' && targetPlayerItem2 && targetPlayerItem2.name !== secItem.name) {
+        if (inventory.invType === 'steal' && targetPlayerItem2 && !canStackItems(secItem, targetPlayerItem2)) {
           postNUI('StealSwapBetween', { playerSlot: toSlot, stealSlot: dragFrom.value })
           playPopSound()
-        } else if (targetPlayerItem2 && targetPlayerItem2.name !== secItem.name) {
+        } else if (targetPlayerItem2 && !canStackItems(secItem, targetPlayerItem2)) {
           dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return
         } else {
           var type = inventory.invType
           var mapping = takeFromActions[type]
           if (mapping) {
-            var amount = transferAmount.value
-            if (!amount || amount <= 0 || amount > secItem.count) amount = secItem.count
+            var amount = getTransferAmount(secItem)
             var payload = { item: secItem, type: secItem.type, number: amount, targetSlot: toSlot }
             payload[mapping.key] = mapping.getId()
             postNUI(mapping.action, payload)
@@ -247,9 +282,8 @@
       var craftItem = inventory.getCraftItemAtSlot(dragFrom.value)
       if (craftItem) {
         var targetPlayerItem3 = inventory.getItemAtSlot(toSlot)
-        if (targetPlayerItem3 && targetPlayerItem3.name !== craftItem.name) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
-        var amount = transferAmount.value
-        if (!amount || amount <= 0 || amount > craftItem.count) amount = craftItem.count
+        if (targetPlayerItem3 && !canStackItems(craftItem, targetPlayerItem3)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
+        var amount = getTransferAmount(craftItem)
         postNUI('CraftRemoveItem', { fromSlot: dragFrom.value, amount: amount, targetSlot: toSlot })
         playPopSound()
       }
@@ -260,8 +294,7 @@
     }
     if (dragFrom.value !== toSlot) {
       var fromItem = inventory.getItemAtSlot(dragFrom.value)
-      var amount = transferAmount.value || 0
-      if (fromItem && amount > fromItem.count) amount = fromItem.count
+      var amount = fromItem ? getTransferAmount(fromItem) : 0
       inventory.swapSlots(dragFrom.value, toSlot, amount > 0 ? amount : null)
       playPopSound()
     }
@@ -293,10 +326,9 @@
       if (item) {
         // Block if target slot has different item
         var targetDropItem = inventory.getDropZoneItemAtSlot(toSlot)
-        if (targetDropItem && targetDropItem.name !== item.name) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
+        if (targetDropItem && !canStackItems(item, targetDropItem)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
 
-        var amount = transferAmount.value
-        if (!amount || amount <= 0 || amount > item.count) amount = item.count
+        var amount = getTransferAmount(item)
 
         // Check drop weight limit
         var dropConfig = inventory.LuaConfig.DropInventory
@@ -318,8 +350,7 @@
       }
     } else if (dragSource.value === 'dropzone' && dragFrom.value !== toSlot) {
       var fromItem = inventory.getDropZoneItemAtSlot(dragFrom.value)
-      var amount = transferAmount.value || 0
-      if (fromItem && amount > fromItem.amount) amount = fromItem.amount
+      var amount = fromItem ? getTransferAmount(Object.assign({}, fromItem, { count: fromItem.amount })) : 0
       inventory.swapDropSlots(dragFrom.value, toSlot, amount > 0 ? amount : null)
       playPopSound()
     }
@@ -335,8 +366,7 @@
     if (!item) { dragFrom.value = null; dragGhost.value.show = false; return }
     if (item.locked && item.type !== 'item_money' && item.type !== 'item_gold') { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
 
-    var amount = transferAmount.value
-    if (!amount || amount <= 0 || amount > item.count) amount = item.count
+    var amount = getTransferAmount(item)
 
     var giveType = item.type
     var giveItem = item.name
@@ -364,8 +394,7 @@
     if (item.type === 'item_weapon' && (item.used || item.used2)) {
       postNUI('UnequipWeapon', { item: item.name, id: item.id })
     } else {
-      var useAmt = transferAmount.value
-      if (!useAmt || useAmt <= 0 || useAmt > item.count) useAmt = item.count
+      var useAmt = getTransferAmount(item)
       postNUI('UseItem', { item: item.name, type: item.type, hash: item.hash, amount: useAmt, id: item.id })
     }
     playPopSound()
@@ -409,9 +438,8 @@
       var item = inventory.getItemAtSlot(dragFrom.value)
       if (item) {
         var targetCraftItem = inventory.getCraftItemAtSlot(toSlot)
-        if (targetCraftItem && targetCraftItem.name !== item.name) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
-        var amount = transferAmount.value
-        if (!amount || amount <= 0 || amount > item.count) amount = item.count
+        if (targetCraftItem && !canStackItems(item, targetCraftItem)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
+        var amount = getTransferAmount(item)
         postNUI('CraftAddItem', { itemId: item.id, amount: amount, targetSlot: toSlot })
         playPopSound()
       }
@@ -420,9 +448,8 @@
       var fromItem = inventory.getCraftItemAtSlot(dragFrom.value)
       var toItem = inventory.getCraftItemAtSlot(toSlot)
       if (fromItem) {
-        var amount = transferAmount.value || 0
-        if (amount > fromItem.count) amount = fromItem.count
-        if (toItem && toItem.name === fromItem.name) {
+        var amount = getTransferAmount(fromItem)
+        if (canStackItems(fromItem, toItem)) {
           postNUI('CraftMergeSlot', { fromSlot: dragFrom.value, toSlot: toSlot, amount: amount || fromItem.count })
         } else if (!toItem && amount > 0 && amount < fromItem.count) {
           postNUI('CraftSplitSlot', { fromSlot: dragFrom.value, toSlot: toSlot, amount: amount })
@@ -441,7 +468,7 @@
     contextMenu.value.show = false
   }
 
-  const reservedMetaKeys = ['label', 'description', 'image', 'weight', 'tooltip', 'context', 'orgdescription']
+  const reservedMetaKeys = ['label', 'description', 'image', 'weight', 'tooltip', 'context', 'orgdescription', 'lumberdurability']
 
   function isReservedMeta(key) {
     return reservedMetaKeys.indexOf(key) !== -1
@@ -574,17 +601,16 @@
       if (item) {
         var targetSecItem = inventory.getSecondItemAtSlot(toSlot)
         // Steal: swap when different items
-        if (inventory.invType === 'steal' && targetSecItem && targetSecItem.name !== item.name) {
+        if (inventory.invType === 'steal' && targetSecItem && !canStackItems(item, targetSecItem)) {
           postNUI('StealSwapBetween', { playerSlot: dragFrom.value, stealSlot: toSlot })
           playPopSound()
-        } else if (targetSecItem && targetSecItem.name !== item.name) {
+        } else if (targetSecItem && !canStackItems(item, targetSecItem)) {
           dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return
         } else {
           var type = inventory.invType
           var mapping = moveToActions[type]
           if (mapping) {
-            var amount = transferAmount.value
-            if (!amount || amount <= 0 || amount > item.count) amount = item.count
+            var amount = getTransferAmount(item)
             var payload = { item: item, type: item.type, number: amount, targetSlot: toSlot }
             payload[mapping.key] = mapping.getId()
             postNUI(mapping.action, payload)
@@ -595,8 +621,7 @@
     // Second → Second (swap/merge/split within second inventory)
     } else if (dragSource.value === 'second' && dragFrom.value !== toSlot) {
       var fromItem = inventory.getSecondItemAtSlot(dragFrom.value)
-      var amount = transferAmount.value || 0
-      if (fromItem && amount > fromItem.count) amount = fromItem.count
+      var amount = fromItem ? getTransferAmount(fromItem) : 0
       if (inventory.invType === 'steal') {
         inventory.swapStealSlots(dragFrom.value, toSlot, amount > 0 ? amount : null)
       } else {
@@ -663,7 +688,7 @@
               <div class="w-full h-[65%] grid grid-cols-5 gap-1.5 content-start overflow-y-auto">
                   <div v-for="i in (inventory.LuaConfig.PlayerInventorySlots || 25)" :key="i" :id="'player-slot-' + i" @mousedown="onSlotMouseDown($event, i)" @mouseup="onSlotMouseUp(i)" @contextmenu="onSlotRightClick($event, i)" @dblclick="onSlotDoubleClick(i)" class="aspect-square bg-white/[0.08] rounded transition-all hover:opacity-70 p-1 relative flex flex-col items-center justify-center" :class="{ 'opacity-30': dragFrom === i && dragSource === 'player' }" :style="isSearchMatch(i) ? { opacity: searchBlinkOn ? 1 : 0.3, transition: 'opacity 0.3s' } : {}">
                       <template v-if="inventory.getItemAtSlot(i)">
-                          <span class="absolute top-0.5 right-1 text-[10px] text-white/40">{{ slotCount(inventory.getItemAtSlot(i)) }}x</span>
+                          <span class="absolute top-0.5 right-1 text-[10px] text-white/40">{{ slotCount(inventory.getItemAtSlot(i)) }}</span>
                           <span class="absolute top-0.5 left-1 text-[10px] text-white/40">{{ slotWeight(inventory.getItemAtSlot(i)) }}kg</span>
                           <img :src="getItemImage(inventory.getItemAtSlot(i).name)" @error="onImgError" class="absolute inset-0 m-auto max-w-[40%] max-h-[60%] object-contain">
                           <svg v-if="inventory.getItemAtSlot(i).type === 'item_weapon' && inventory.getItemAtSlot(i).durability != null" class="absolute left-1 top-1/2 -translate-y-1/2" width="12" height="12" viewBox="0 0 36 36">
@@ -694,7 +719,7 @@
           </div>
           <div class="w-[30%] h-[80%] relative flex flex-col justify-center items-center">
               <div class="w-[9vw] h-[5vh]  flex justify-center items-center transition-all hover:opacity-70 bg-[url(./assets/amount-background.png)]" style="background-size: 100% 100%;">
-                  <input type="number" v-model.number="transferAmount" min="1" step="1" @keydown="$event.key === '.' || $event.key === '-' || $event.key === 'e' ? $event.preventDefault() : null" class="w-full h-full text-center text-xl text-[#BEB592]" placeholder="1">
+                  <input type="number" v-model.number="transferAmount" min="0.01" step="any" @keydown="$event.key === '-' || $event.key === 'e' ? $event.preventDefault() : null" class="w-full h-full text-center text-xl text-[#BEB592]" placeholder="1">
               </div>
               <div @mouseup="onDropUse" class="w-[9vw] h-[5vh] mt-2 flex justify-center text-xl text-[#BEB592] items-center transition-all cursor-pointer bg-[url(./assets/buttons-background.png)]" :style="{ opacity: dragFrom !== null && dragSource === 'player' ? 1 : 0.4, backgroundSize: '100% 100%' }">
                   Use
@@ -781,7 +806,7 @@
                 <div class="w-full h-[80%] grid grid-cols-5 gap-1.5 content-start overflow-y-auto">
                     <div v-for="i in 35" :key="i" @mousedown="onSecondMouseDown($event, i)" @mouseup="onSecondMouseUp(i)" class="aspect-square bg-white/[0.08] rounded transition-all hover:opacity-70 p-1 relative flex flex-col items-center justify-center" :class="{ 'opacity-30': dragFrom === i && dragSource === 'second' }">
                         <template v-if="inventory.getSecondItemAtSlot(i)">
-                            <span class="absolute top-0.5 right-1 text-[10px] text-white/40">{{ slotCount(inventory.getSecondItemAtSlot(i)) }}x</span>
+                            <span class="absolute top-0.5 right-1 text-[10px] text-white/40">{{ slotCount(inventory.getSecondItemAtSlot(i)) }}</span>
                             <span class="absolute top-0.5 left-1 text-[10px] text-white/40">{{ slotWeight(inventory.getSecondItemAtSlot(i)) }}kg</span>
                             <img :src="getItemImage(inventory.getSecondItemAtSlot(i).name)" @error="onImgError" class="absolute inset-0 m-auto max-w-[40%] max-h-[60%] object-contain">
                             <svg v-if="inventory.getSecondItemAtSlot(i).type === 'item_weapon' && inventory.getSecondItemAtSlot(i).durability != null" class="absolute left-1 top-1/2 -translate-y-1/2" width="12" height="12" viewBox="0 0 36 36">
@@ -1133,7 +1158,7 @@
             <div class="grid grid-cols-5 gap-1.5 p-3 h-full w-full place-items-center">
               <div v-for="i in 5" :key="i" class="aspect-square h-[calc(100%-4px)] bg-white/[0.08] rounded transition-all hover:opacity-70 p-1 relative flex flex-col items-center justify-center">
                   <template v-if="inventory.getItemAtSlot(i)">
-                      <span class="absolute top-0.5 right-1 text-[10px] text-white/40">{{ slotCount(inventory.getItemAtSlot(i)) }}x</span>
+                      <span class="absolute top-0.5 right-1 text-[10px] text-white/40">{{ slotCount(inventory.getItemAtSlot(i)) }}</span>
                       <span class="absolute top-0.5 left-1 text-[10px] text-white/40">{{ slotWeight(inventory.getItemAtSlot(i)) }}kg</span>
                       <img :src="getItemImage(inventory.getItemAtSlot(i).name)" @error="onImgError" class="absolute inset-0 m-auto max-w-[40%] max-h-[60%] object-contain">
                       <svg v-if="inventory.getItemAtSlot(i).type === 'item_weapon' && inventory.getItemAtSlot(i).durability != null" class="absolute left-1 top-1/2 -translate-y-1/2" width="10" height="10" viewBox="0 0 36 36">
