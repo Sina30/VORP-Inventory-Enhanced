@@ -41,18 +41,6 @@ local function isControlDown(controls)
             if IsDisabledControlPressed(padIndex, control) or IsControlPressed(padIndex, control) then
                 return true
             end
-
-            if GetDisabledControlNormal and (GetDisabledControlNormal(padIndex, control) or 0.0) > 0.0 then
-                return true
-            end
-
-            if GetControlNormal and (GetControlNormal(padIndex, control) or 0.0) > 0.0 then
-                return true
-            end
-
-            if GetControlValue and (GetControlValue(padIndex, control) or 0) > 0 then
-                return true
-            end
         end
     end
 

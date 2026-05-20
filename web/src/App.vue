@@ -703,6 +703,7 @@
                             <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="4"></circle>
                             <circle cx="18" cy="18" r="15" fill="none" :stroke="getDegradationColor(inventory.getItemAtSlot(i).durability)" stroke-width="4" stroke-linecap="round" :stroke-dasharray="(inventory.getItemAtSlot(i).durability / 100 * 94.2) + ' 94.2'" transform="rotate(-90 18 18)"></circle>
                           </svg>
+                          <span v-if="isEquippedWeapon(inventory.getItemAtSlot(i))" class="absolute left-1 text-[12px] font-semibold leading-none text-[#2fd06c] pointer-events-none" style="top: calc(50% - 22px); text-shadow: 0 1px 2px rgba(0,0,0,0.65);">E</span>
                           <p class="absolute bottom-0.5 left-0 right-0 text-center text-[10px] text-white/70 truncate px-0.5">{{ inventory.getItemAtSlot(i).label }}</p>
                       </template>
                       <template v-else>
@@ -1173,6 +1174,7 @@
                         <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="4"></circle>
                         <circle cx="18" cy="18" r="15" fill="none" :stroke="getDegradationColor(inventory.getItemAtSlot(i).durability)" stroke-width="4" stroke-linecap="round" :stroke-dasharray="(inventory.getItemAtSlot(i).durability / 100 * 94.2) + ' 94.2'" transform="rotate(-90 18 18)"></circle>
                       </svg>
+                      <span v-if="isEquippedWeapon(inventory.getItemAtSlot(i))" class="absolute left-1 text-[10px] font-semibold leading-none text-[#2fd06c] pointer-events-none" style="top: calc(50% - 19px); text-shadow: 0 1px 2px rgba(0,0,0,0.65);">E</span>
                       <p class="absolute bottom-0.5 left-0 right-0 text-center text-[10px] text-white/70 truncate px-0.5">{{ inventory.getItemAtSlot(i).label }}</p>
                   </template>
                   <template v-else>
