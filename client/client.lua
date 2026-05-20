@@ -35,14 +35,67 @@ if Config.DevMode then
     end)
 end
 
--- Hotbar toggle with Tab
+local hotbarHoldMs = 350
+local hotbarKeyState = {}
+
+local function handleHotbarPress(slot)
+    if InInventory then return end
+
+    local existingState = hotbarKeyState[slot]
+    if existingState and existingState.pressed then return end
+
+    local state = {
+        pressed = true,
+        handled = false,
+        pressedAt = GetGameTimer(),
+    }
+    hotbarKeyState[slot] = state
+
+    CreateThread(function()
+        Wait(hotbarHoldMs)
+
+        local currentState = hotbarKeyState[slot]
+        if currentState ~= state or not currentState.pressed or currentState.handled or InInventory then return end
+
+        NUIService.HolsterHotbarSlot(slot)
+        currentState.handled = true
+    end)
+end
+
+local function handleHotbarRelease(slot)
+    local state = hotbarKeyState[slot]
+    if not state then return end
+
+    hotbarKeyState[slot] = nil
+
+    if InInventory or state.handled then return end
+
+    if (GetGameTimer() - state.pressedAt) >= hotbarHoldMs then
+        NUIService.HolsterHotbarSlot(slot)
+    else
+        NUIService.UseHotbarSlot(slot)
+    end
+end
+
+for slot = 1, 5 do
+    local currentSlot = slot
+    local commandName = ("vorp_inventory_hotbar_%d"):format(currentSlot)
+
+    RegisterCommand(("+" .. commandName), function()
+        handleHotbarPress(currentSlot)
+    end, false)
+
+    RegisterCommand(("-" .. commandName), function()
+        handleHotbarRelease(currentSlot)
+    end, false)
+
+    RegisterKeyMapping(("+" .. commandName), ("Use hotbar slot %d"):format(currentSlot), "keyboard", tostring(currentSlot))
+end
+
+-- Hotbar toggle with Tab and suppress native weapon-slot controls.
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
     local tabControl = 0xB238FE0B
-    local hotbarHoldMs = 350
-    local pressedSlot = nil
-    local pressedAt = 0
-    local holdHandled = false
     local hotbarControls = {
         { control = 0xE6F612E4, slot = 1 },
         { control = 0x1CE6D9EB, slot = 2 },
@@ -62,37 +115,10 @@ CreateThread(function()
             SendNUIMessage({ action = "toggleHotbar" })
         end
 
-        if not InInventory then
-            for _, hotkey in ipairs(hotbarControls) do
-                if not pressedSlot and IsDisabledControlJustPressed(0, hotkey.control) then
-                    pressedSlot = hotkey.slot
-                    pressedAt = GetGameTimer()
-                    holdHandled = false
-                end
-
-                if pressedSlot == hotkey.slot and IsDisabledControlPressed(0, hotkey.control) and not holdHandled and (GetGameTimer() - pressedAt) >= hotbarHoldMs then
-                    NUIService.HolsterHotbarSlot(pressedSlot)
-                    holdHandled = true
-                end
-
-                if pressedSlot == hotkey.slot and IsDisabledControlJustReleased(0, hotkey.control) then
-                    local heldLongEnough = (GetGameTimer() - pressedAt) >= hotbarHoldMs
-                    if not holdHandled then
-                        if heldLongEnough then
-                            NUIService.HolsterHotbarSlot(pressedSlot)
-                        else
-                            NUIService.UseHotbarSlot(pressedSlot)
-                        end
-                    end
-                    pressedSlot = nil
-                    pressedAt = 0
-                    holdHandled = false
-                end
+        if InInventory then
+            for slot = 1, 5 do
+                hotbarKeyState[slot] = nil
             end
-        else
-            pressedSlot = nil
-            pressedAt = 0
-            holdHandled = false
         end
     end
 end)
