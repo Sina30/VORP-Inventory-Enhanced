@@ -76,8 +76,15 @@ CreateThread(function()
                 end
 
                 if pressedSlot == hotkey.slot and IsDisabledControlJustReleased(0, hotkey.control) then
+                    local heldLongEnough = (GetGameTimer() - pressedAt) >= hotbarHoldMs
                     if not holdHandled then
-                        NUIService.UseHotbarSlot(pressedSlot)
+                        if heldLongEnough then
+                            print("Hotbar slot " .. hotkey.slot .. " held, but not handled. Holstering as fallback.")
+                            NUIService.HolsterHotbarSlot(pressedSlot)
+                        else
+                            print("Hotbar slot " .. hotkey.slot .. " tapped. Using item.")
+                            NUIService.UseHotbarSlot(pressedSlot)
+                        end
                     end
                     pressedSlot = nil
                     pressedAt = 0

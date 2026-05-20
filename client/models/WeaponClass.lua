@@ -176,7 +176,9 @@ function Weapon:equipwep()
 	local isWeaponThrowable = Citizen.InvokeNative(0x30E7C16B12DA8211, weaponHash_0)
 	local isWeaponAGun = Citizen.InvokeNative(0x705BE297EEBDB95D, weaponHash_0)
 	local isWeaponOneHanded = Citizen.InvokeNative(0xD955FEE4B87AFA07, weaponHash_0)
-	local isWeaponPetrolCan = GetWeapontypeGroup(weaponHash_0) == joaat("GROUP_PETROLCAN")
+	local weaponGroup = GetWeapontypeGroup(weaponHash_0)
+	local isWeaponBow = weaponGroup == joaat("GROUP_BOW")
+	local isWeaponPetrolCan = weaponGroup == joaat("GROUP_PETROLCAN")
 	local playerPedId = PlayerPedId()
 	local ammoCount = 0
 	-- is weapon assigned as no ammo needed then set to 1 so it can be used
@@ -184,11 +186,10 @@ function Weapon:equipwep()
 		ammoCount = 1
 	end
 
-	-- Pull current ammo for throwable/petrol weapons
+	-- Pull current ammo for weapons that need ammo while being given to the ped.
 	-- First try weapon's own ammo (loadout.ammo), fallback to player ammo cache
-	if isWeaponThrowable or isWeaponPetrolCan then
-		local wepgroup = GetWeapontypeGroup(weaponHash_0)
-		local ammotypes = SharedData.AmmoTypes and SharedData.AmmoTypes[wepgroup]
+	if isWeaponThrowable or isWeaponBow or isWeaponPetrolCan then
+		local ammotypes = SharedData.AmmoTypes and SharedData.AmmoTypes[weaponGroup]
 		if ammotypes then
 			for ammo_name, _ in pairs(ammotypes) do
 				local qty = self.ammo and self.ammo[ammo_name]
@@ -201,6 +202,9 @@ function Weapon:equipwep()
 				end
 			end
 		end
+	end
+	if isWeaponBow and ammoCount <= 0 then
+		ammoCount = 1
 	end
 
 	if isWeaponMelee or isWeaponThrowable or isWeaponPetrolCan then
