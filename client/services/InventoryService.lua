@@ -2,6 +2,7 @@ ClientItems = {}
 InventoryService = {}
 UserWeapons = {}
 UserInventory = {}
+local loadoutInitialized = false
 
 
 function findNextFreeSlot()
@@ -163,35 +164,58 @@ function InventoryService.getLoadout(loadout)
 		if weapon.used2 == 1 or weapon.used2 == true then weaponUsed2 = true end
 
 		if weapon.currInv == "default" and (weapon.dropped == nil or weapon.dropped == 0) then
-			local newWeapon = Weapon:New({
-				id = tonumber(weapon.id),
-				identifier = weapon.identifier,
-				label = weapon.custom_label or Utils.GetWeaponDefaultLabel(weapon.name),
-				name = weapon.name,
-				ammo = weaponAmmo,
-				components = weapon.components,
-				used = weaponUsed,
-				used2 = weaponUsed2,
-				desc = weapon.custom_desc or Utils.GetWeaponDefaultDesc(weapon.name),
-				currInv = weapon.curr_inv,
-				dropped = 0,
-				group = 5,
-				custom_label = weapon.custom_label,
-				serial_number = weapon.serial_number,
-				custom_desc = weapon.custom_desc,
-				weight = weapon.weight,
-				slot = weapon.slot,
-				ammo_total = weapon.ammo_total or 0,
-				durability = weapon.durability or 100,
-				comps = weapon.comps or {}
-			})
-			UserWeapons[newWeapon:getId()] = newWeapon
+			local weaponId = tonumber(weapon.id)
+			local existingWeapon = UserWeapons[weaponId]
+			if existingWeapon then
+				existingWeapon:setPropietary(weapon.identifier)
+				existingWeapon:setLabel(weapon.custom_label or Utils.GetWeaponDefaultLabel(weapon.name))
+				existingWeapon:setName(weapon.name)
+				existingWeapon.ammo = weaponAmmo
+				existingWeapon.components = weapon.components
+				existingWeapon:setDesc(weapon.custom_desc or Utils.GetWeaponDefaultDesc(weapon.name))
+				existingWeapon:setCurrInv(weapon.curr_inv)
+				existingWeapon.dropped = 0
+				existingWeapon.group = 5
+				existingWeapon:setCustomLabel(weapon.custom_label)
+				existingWeapon:setSerialNumber(weapon.serial_number)
+				existingWeapon:setCustomDesc(weapon.custom_desc)
+				existingWeapon.weight = weapon.weight
+				existingWeapon:setSlot(weapon.slot)
+				existingWeapon:setAmmoTotal(weapon.ammo_total or 0)
+				existingWeapon:setDurability(weapon.durability or 100)
+				existingWeapon.comps = weapon.comps or {}
+			else
+				local newWeapon = Weapon:New({
+					id = weaponId,
+					identifier = weapon.identifier,
+					label = weapon.custom_label or Utils.GetWeaponDefaultLabel(weapon.name),
+					name = weapon.name,
+					ammo = weaponAmmo,
+					components = weapon.components,
+					used = weaponUsed,
+					used2 = weaponUsed2,
+					desc = weapon.custom_desc or Utils.GetWeaponDefaultDesc(weapon.name),
+					currInv = weapon.curr_inv,
+					dropped = 0,
+					group = 5,
+					custom_label = weapon.custom_label,
+					serial_number = weapon.serial_number,
+					custom_desc = weapon.custom_desc,
+					weight = weapon.weight,
+					slot = weapon.slot,
+					ammo_total = weapon.ammo_total or 0,
+					durability = weapon.durability or 100,
+					comps = weapon.comps or {}
+				})
+				UserWeapons[newWeapon:getId()] = newWeapon
 
-			if newWeapon:getUsed() then
-				Utils.useWeapon(newWeapon:getId())
+				if not loadoutInitialized and newWeapon:getUsed() then
+					Utils.useWeapon(newWeapon:getId())
+				end
 			end
 		end
 	end
+	loadoutInitialized = true
 end
 
 function InventoryService.getInventory(inventory)

@@ -122,6 +122,7 @@ Locales['en'] = {
         cancel                    = "Cancel",
         confirm                   = "Confirm",
         amount                    = "Amount",
+        item_limit                = "Item Limit",
         select_player             = "Select Player",
         repairing                 = "Repairing...",
 
@@ -161,6 +162,8 @@ Locales['en'] = {
         gloves                    = "Gloves",
 
         -- Craft panel
+        craft_inventory           = "Craft Inventory",
+        craft_progress            = "Craft Progress",
         craft_prepare             = "Prepare items to see progress!",
         craft_reward              = "Reward",
         craft_ingredients         = "Ingredients",
@@ -404,6 +407,7 @@ Locales['fr'] = {
         cancel                    = "Annuler",
         confirm                   = "Confirmer",
         amount                    = "Quantité",
+        item_limit                = "Limite d'objets",
         select_player             = "Sélectionner un joueur",
         repairing                 = "Réparation...",
 
@@ -438,6 +442,8 @@ Locales['fr'] = {
         pant                      = "Pantalon",
         gloves                    = "Gants",
 
+        craft_inventory           = "Inventaire de fabrication",
+        craft_progress            = "Progression de fabrication",
         craft_prepare             = "Préparez les objets pour voir la progression !",
         craft_reward              = "Récompense",
         craft_ingredients         = "Ingrédients",
@@ -865,7 +871,24 @@ Locales['ar'] = {
     },
 }
 
-_l = (Lang and Locales[Lang]) and Lang or "en"
+local langAliases = {
+    english = "en",
+    turkish = "tr",
+    french = "fr",
+    francais = "fr",
+    ["fr-fr"] = "fr",
+    spanish = "es",
+    italian = "it",
+    arabic = "ar",
+}
+
+local selectedLang = Lang
+if type(selectedLang) == "string" then
+    selectedLang = selectedLang:lower()
+    selectedLang = langAliases[selectedLang] or selectedLang
+end
+
+_l = (selectedLang and Locales[selectedLang]) and selectedLang or "en"
 
 function T(lang, key, ...)
     -- Backwards compat: if first arg is the key (no second arg), treat lang as key

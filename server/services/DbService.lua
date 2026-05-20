@@ -25,6 +25,14 @@ function DBService.SetItemAmount(sourceCharIdentifier, itemCraftedId, amount)
     })
 end
 
+function DBService.SetCustomInventoryItemAmount(inventoryId, itemCraftedId, amount)
+    MySQL.update.await("UPDATE character_inventories SET amount = @amount WHERE inventory_type = @invId AND item_crafted_id = @itemid;", {
+        amount = tonumber(amount),
+        invId = inventoryId,
+        itemid = tonumber(itemCraftedId)
+    })
+end
+
 function DBService.SetItemMetadata(sourceCharIdentifier, itemCraftedId, metadata)
     MySQL.update("UPDATE items_crafted SET metadata = @metadata WHERE character_id = @charid AND id = @itemid;", {
         metadata = json.encode(metadata),
@@ -38,6 +46,21 @@ function DBService.DeleteItem(sourceCharIdentifier, itemCraftedId)
         {
             query = "DELETE FROM character_inventories WHERE character_id = ? AND item_crafted_id = ?",
             values = { tonumber(sourceCharIdentifier), tonumber(itemCraftedId) }
+        },
+        {
+            query = "DELETE FROM items_crafted WHERE id = ?",
+            values = { tonumber(itemCraftedId) }
+        }
+    }
+
+    MySQL.transaction.await(queries)
+end
+
+function DBService.DeleteCustomInventoryItem(inventoryId, itemCraftedId)
+    local queries = {
+        {
+            query = "DELETE FROM character_inventories WHERE inventory_type = ? AND item_crafted_id = ?",
+            values = { inventoryId, tonumber(itemCraftedId) }
         },
         {
             query = "DELETE FROM items_crafted WHERE id = ?",
@@ -72,6 +95,14 @@ function DBService.UpdateItemSlot(charIdentifier, itemCraftedId, slot)
     MySQL.update.await("UPDATE character_inventories SET slot = @slot WHERE character_id = @charid AND item_crafted_id = @itemid;", {
         slot = slot,
         charid = tonumber(charIdentifier),
+        itemid = tonumber(itemCraftedId)
+    })
+end
+
+function DBService.UpdateCustomInventoryItemSlot(inventoryId, itemCraftedId, slot)
+    MySQL.update.await("UPDATE character_inventories SET slot = @slot WHERE inventory_type = @invId AND item_crafted_id = @itemid;", {
+        slot = slot,
+        invId = inventoryId,
         itemid = tonumber(itemCraftedId)
     })
 end

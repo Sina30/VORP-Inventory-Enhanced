@@ -78,7 +78,7 @@ CreateThread(function()
             local isBowGroup <const> = wepgroup == `GROUP_BOW`
             local isPetrol <const> = wepgroup == `GROUP_PETROLCAN`
 
-            if ammotypes and (isArmed or isThrownGroup or isPetrol) and not ismelee then
+            if ammotypes and (isArmed or isThrownGroup or isBowGroup or isPetrol) and not ismelee then
                 for ammo_name, ammo_data in pairs(ammotypes) do
                     if playerammoinfo.ammo[ammo_name] then -- is ammo valid
                         local ammoQty = GetPedAmmoByType(playerPedId, joaat(ammo_name))

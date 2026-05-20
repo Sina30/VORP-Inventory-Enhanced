@@ -28,6 +28,11 @@
     return new URL(`./assets/${filename}`, import.meta.url).href
   }
 
+  function uiText(key, fallback) {
+    var ui = inventory.LANGUAGE && inventory.LANGUAGE.ui ? inventory.LANGUAGE.ui : {}
+    return ui[key] || fallback
+  }
+
   function slotCount(item) {
     if (item.type === 'item_weapon') return '1x'
     if (item.type === 'item_money' || item.type === 'item_gold') return formatCurrencyAmount(item.count)
@@ -543,18 +548,18 @@
   })
 
   const clothingSlots = ref([
-    { id: 1,  label: 'Hat',      icon: 'hat-icon.png',      param: 'hat',      x: 28, y: 12,  rotate: 0,    lineSide: 'right' },
-    { id: 2,  label: 'Mask',     icon: 'mask-icon.png',     param: 'mask',     x: 69, y: 18,  rotate: 0,    lineSide: 'left' },
-    { id: 3,  label: 'Neckwear', icon: 'neckwear-icon.png', param: 'neckwear', x: 33, y: 22,  rotate: 0,    lineSide: 'right' },
-    { id: 4,  label: 'Shirt',    icon: 'shirt-icon.png',    param: 'shirt',    x: 33, y: 40,  rotate: 0,    lineSide: 'right' },
-    { id: 5,  label: 'Vest',     icon: 'vest-icon.png',     param: 'vest',     x: 30, y: 31,  rotate: 0,    lineSide: 'right' },
-    { id: 6,  label: 'Poncho',   icon: 'poncho-icon.png',   param: 'poncho',   x: 74, y: 28,  rotate: 0,    lineSide: 'left' },
-    { id: 7,  label: 'Coat',     icon: 'coat-icon.png',     param: 'coat',     x: 70, y: 40,  rotate: 0,    lineSide: 'left' },
-    { id: 8,  label: 'Belt',     icon: 'belt-icon.png',     param: 'belt',     x: 35, y: 52,  rotate: -35,  lineSide: 'right' },
-    { id: 9,  label: 'Sleeves',  icon: 'sleeves-icon.png',  param: 'sleeves',  x: 77, y: 50,  rotate: 35,   lineSide: 'left' },
-    { id: 10, label: 'Boots',    icon: 'boots-icon.png',    param: 'boots',    x: 22, y: 84,  rotate: 0,    lineSide: 'right' },
-    { id: 11, label: 'Pant',     icon: 'pant-icon.png',     param: 'ccoat',    x: 69, y: 70,  rotate: 40,   lineSide: 'left' },
-    { id: 12, label: 'Gloves',   icon: 'glove-icon.png',    param: 'glove',   x: 14, y: 48,  rotate: 0,    lineSide: 'right' },
+    { id: 1,  key: 'hat',      label: 'Hat',      icon: 'hat-icon.png',      param: 'hat',      x: 28, y: 12,  rotate: 0,    lineSide: 'right' },
+    { id: 2,  key: 'mask',     label: 'Mask',     icon: 'mask-icon.png',     param: 'mask',     x: 69, y: 18,  rotate: 0,    lineSide: 'left' },
+    { id: 3,  key: 'neckwear', label: 'Neckwear', icon: 'neckwear-icon.png', param: 'neckwear', x: 33, y: 22,  rotate: 0,    lineSide: 'right' },
+    { id: 4,  key: 'shirt',    label: 'Shirt',    icon: 'shirt-icon.png',    param: 'shirt',    x: 33, y: 40,  rotate: 0,    lineSide: 'right' },
+    { id: 5,  key: 'vest',     label: 'Vest',     icon: 'vest-icon.png',     param: 'vest',     x: 30, y: 31,  rotate: 0,    lineSide: 'right' },
+    { id: 6,  key: 'poncho',   label: 'Poncho',   icon: 'poncho-icon.png',   param: 'poncho',   x: 74, y: 28,  rotate: 0,    lineSide: 'left' },
+    { id: 7,  key: 'coat',     label: 'Coat',     icon: 'coat-icon.png',     param: 'coat',     x: 70, y: 40,  rotate: 0,    lineSide: 'left' },
+    { id: 8,  key: 'belt',     label: 'Belt',     icon: 'belt-icon.png',     param: 'belt',     x: 35, y: 52,  rotate: -35,  lineSide: 'right' },
+    { id: 9,  key: 'sleeves',  label: 'Sleeves',  icon: 'sleeves-icon.png',  param: 'sleeves',  x: 77, y: 50,  rotate: 35,   lineSide: 'left' },
+    { id: 10, key: 'boots',    label: 'Boots',    icon: 'boots-icon.png',    param: 'boots',    x: 22, y: 84,  rotate: 0,    lineSide: 'right' },
+    { id: 11, key: 'pant',     label: 'Pant',     icon: 'pant-icon.png',     param: 'ccoat',    x: 69, y: 70,  rotate: 40,   lineSide: 'left' },
+    { id: 12, key: 'gloves',   label: 'Gloves',   icon: 'glove-icon.png',    param: 'glove',   x: 14, y: 48,  rotate: 0,    lineSide: 'right' },
   ])
 
   // Second inventory transfer mappings (same as old UI)
@@ -662,7 +667,7 @@
       <div v-if="inventory.isVisible" class="w-full h-full z-20 flex justify-between items-center">
           <div class="w-[28%] h-[80%] p-6 flex flex-col justify-between items-center  bg-[url(./assets/inventory-background.png)]" style="background-size: 100% 100%;">
               <div height="9%" class="p-2 flex justify-between items-center h-[9%] w-full bg-[url(./assets/header-background.png)]" style="background-size: 100% 100%;">
-                  <p class="text-xl">{{ inventory.LuaConfig.ShowCharacterNameInTitle && inventory.charName ? inventory.charName + ' - ' + inventory.charId : 'Inventory - ' + inventory.charId }}</p>
+                  <p class="text-xl">{{ inventory.LuaConfig.ShowCharacterNameInTitle && inventory.charName ? inventory.charName + ' - ' + inventory.charId : uiText('inventory_title', 'Inventory') + ' - ' + inventory.charId }}</p>
                   <div class="w-[2vw] h-[2vw]  flex justify-center items-center rounded-md bg-black/10">
                       <img src="./assets/inventory-icon.png">
                   </div>
@@ -682,7 +687,7 @@
                             <div class="weight-bar-fill" :style="{ width: inventory.maxWeight ? (inventory.currentWeight / inventory.maxWeight * 100) + '%' : '0%' }"></div>
                           </div>
                           <div class="flex  w-full justify-between items-center">
-                              <p class="text-sm text-[#BEB592]">Weight</p>
+                              <p class="text-sm text-[#BEB592]">{{ uiText('weight', 'Weight') }}</p>
                               <p class="text-sm text-[#BEB592]"><span class="font-semibold">{{ inventory.currentWeight }}</span>/{{ inventory.maxWeight }}{{ inventory.LuaConfig.WeightMeasure || 'kg' }}</p>
                           </div>
                           
@@ -690,7 +695,7 @@
                   </div>
                   <div class="p-2 flex items-center gap-2 w-full bg-[url(./assets/search-background.png)]" style="background-size: 100% 100%;">
                       <img src="./assets/search-icon.png">
-                      <input type="text" v-model="searchQuery" @input="onSearchInput" class="w-[70%] h-full text-[#000000]" placeholder="Search any item...">
+                      <input type="text" v-model="searchQuery" @input="onSearchInput" class="w-[70%] h-full text-[#000000]" :placeholder="uiText('search_placeholder', 'Search any item...')">
                   </div>
               </div>
               <div class="w-full h-[65%] grid grid-cols-5 gap-1.5 content-start overflow-y-auto">
@@ -714,15 +719,15 @@
               <div class="w-full h-[8%]  flex justify-between items-end">
                   <div @click="inventory.hide()" class="w-[32%] h-[70%] flex justify-between items-center p-2 transition-all hover:opacity-70 cursor-pointer bg-[url(./assets/bottom-menu-background.png)]" style="background-size: 100% 100%;">
                     <img src="./assets/close-icon.png">
-                    <p class="text-xs">Close Inventory</p>
+                    <p class="text-xs">{{ uiText('close_inventory', 'Close Inventory') }}</p>
                   </div>
                   <div @click="inventory.secondInventoryType = inventory.secondInventoryType === 'clothing' ? (inventory.invType === 'main' ? 'drop' : 'inventory') : 'clothing'" class="w-[32%] h-[70%] flex justify-between items-center p-2 transition-all hover:opacity-70 cursor-pointer bg-[url(./assets/bottom-menu-background.png)]" style="background-size: 100% 100%;">
                     <img src="./assets/clothing-icon.png">
-                    <p class="text-xs">Clothing Menu</p>
+                    <p class="text-xs">{{ uiText('clothing_menu', 'Clothing Menu') }}</p>
                   </div>
                   <div @click="settings.toggle()" class="w-[32%] h-[70%] flex justify-between items-center p-2 transition-all hover:opacity-70 cursor-pointer bg-[url(./assets/bottom-menu-background.png)]" style="background-size: 100% 100%;">
                     <img src="./assets/settings-icon.png">
-                    <p class="text-xs">Settings</p>
+                    <p class="text-xs">{{ uiText('settings', 'Settings') }}</p>
                   </div>
               </div>
           </div>
@@ -731,10 +736,10 @@
                   <input type="number" v-model.number="transferAmount" min="0.01" step="any" @keydown="$event.key === '-' || $event.key === 'e' ? $event.preventDefault() : null" class="w-full h-full text-center text-xl text-[#BEB592]" placeholder="1">
               </div>
               <div @mouseup="onDropUse" class="w-[9vw] h-[5vh] mt-2 flex justify-center text-xl text-[#BEB592] items-center transition-all cursor-pointer bg-[url(./assets/buttons-background.png)]" :style="{ opacity: dragFrom !== null && dragSource === 'player' ? 1 : 0.4, backgroundSize: '100% 100%' }">
-                  Use
+                  {{ uiText('use', 'Use') }}
               </div>
               <div @mouseup="onDropGive" class="w-[9vw] h-[5vh] flex justify-center text-xl text-[#BEB592] items-center transition-all cursor-pointer bg-[url(./assets/buttons-background.png)]" :style="{ opacity: dragFrom !== null && dragSource === 'player' ? 1 : 0.4, backgroundSize: '100% 100%' }">
-                  Give
+                  {{ uiText('give', 'Give') }}
               </div>
               <!-- settings panel -->
               <Transition name="fade">
@@ -744,7 +749,7 @@
                     <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center">
                         <img src="./assets/sound-effects-icon.png">
                     </div>
-                    <p>Enable Sound Effects</p>
+                    <p>{{ uiText('enable_sound_effects', 'Enable Sound Effects') }}</p>
                   </div>
                   <div @click="settings.soundEffects = !settings.soundEffects" class="w-[1.75vw] h-[1.75vw] bg-[url(./assets/toggle-background.png)] cursor-pointer hover:opacity-80 flex justify-center items-center" style="background-size: 100% 100%;">
                       <Transition name="scale"><img v-if="settings.soundEffects" src="./assets/toggled-icon.png"></Transition>
@@ -756,7 +761,7 @@
                     <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center">
                         <img src="./assets/square.png">
                     </div>
-                    <p>Show Item Add/Remove Notifications</p>
+                    <p>{{ uiText('show_notifications', 'Show Item Add/Remove Notifications') }}</p>
                   </div>
                   <div @click="settings.showNotifications = !settings.showNotifications" class="w-[1.75vw] h-[1.75vw] bg-[url(./assets/toggle-background.png)] cursor-pointer hover:opacity-80 flex justify-center items-center" style="background-size: 100% 100%;">
                       <Transition name="scale"><img v-if="settings.showNotifications" src="./assets/toggled-icon.png"></Transition>
@@ -768,7 +773,7 @@
                     <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center">
                         <img src="./assets/notification-duration-icon.png">
                     </div>
-                    <p>Notification Duration</p>
+                    <p>{{ uiText('notification_duration', 'Notification Duration') }}</p>
                   </div>
                   <div class="h-[1.5vw] flex gap-1 items-center">
                       <div class="w-[4vw] h-full bg-[url(./assets/ms-input-background.png)]" style="background-size: 100% 100%;">
@@ -783,7 +788,7 @@
                     <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center">
                         <img src="./assets/double-click-icon.png">
                     </div>
-                    <p>Double Click to Use</p>
+                    <p>{{ uiText('double_click_to_use', 'Double Click to Use') }}</p>
                   </div>
                   <div @click="settings.doubleClickToUse = !settings.doubleClickToUse" class="w-[1.75vw] h-[1.75vw] bg-[url(./assets/toggle-background.png)] cursor-pointer hover:opacity-80 flex justify-center items-center" style="background-size: 100% 100%;">
                       <Transition name="scale"><img v-if="settings.doubleClickToUse" src="./assets/toggled-icon.png"></Transition>
@@ -808,7 +813,7 @@
                       <div class="weight-bar-fill" :style="{ width: inventory.secondCapacity > 0 ? (inventory.secondCurrentCount / inventory.secondCapacity * 100) + '%' : '0%' }"></div>
                     </div>
                     <div class="w-full flex justify-between items-center">
-                        <p class="text-sm text-[#BEB592]">{{ inventory.secondWeight ? 'Max Weight' : 'Item Limit' }}</p>
+                        <p class="text-sm text-[#BEB592]">{{ inventory.secondWeight ? uiText('max_weight', 'Max Weight') : uiText('item_limit', 'Item Limit') }}</p>
                         <p class="text-sm text-[#BEB592]"><span class="font-semibold">{{ inventory.secondCurrentCount }}</span>/{{ inventory.secondCapacity }}{{ inventory.secondWeight ? (inventory.LuaConfig.WeightMeasure || 'kg') : '' }}</p>
                     </div>
                 </div>
@@ -834,7 +839,7 @@
               <!-- Second Inventory: craft -->
               <div v-else-if="inventory.secondInventoryType === 'craft'" key="craft" class="w-full h-full flex flex-col justify-between items-center">
                   <div class="p-2 flex justify-between items-center h-[9%] w-full bg-[url(./assets/header-background.png)]" style="background-size: 100% 100%;">
-                    <p class="text-xl">Craft Inventory</p>
+                    <p class="text-xl">{{ uiText('craft_inventory', 'Craft Inventory') }}</p>
                     <div class="w-[2vw] h-[2vw] flex justify-center items-center rounded-md bg-black/10">
                         <img src="./assets/craft-icon.png">
                     </div>
@@ -845,7 +850,7 @@
                       <div class="weight-bar-fill" :style="{ width: inventory.craftProgress + '%' }"></div>
                     </div>
                     <div class="w-full flex justify-between items-center">
-                        <p class="text-sm text-[#BEB592]">{{ inventory.craftingInProgress ? 'Crafting...' : 'Craft Progress' }}</p>
+                        <p class="text-sm text-[#BEB592]">{{ inventory.craftingInProgress ? uiText('craft_in_progress', 'Crafting...') : uiText('craft_progress', 'Craft Progress') }}</p>
                         <span class="font-semibold text-[#BEB592]">{{ inventory.craftProgress.toFixed(0) }}%</span>
                     </div>
                     
@@ -873,7 +878,7 @@
                   <div class="w-full h-[37%] bg-white/10 rounded-md flex justify-center items-center p-5">
                     <!-- No recipe matched -->
                     <div v-if="!inventory.craftRecipe" class="text-center">
-                      <p class="text-[#898888] text-sm">Prepare items to see progress!</p>
+                      <p class="text-[#898888] text-sm">{{ uiText('craft_prepare', 'Prepare items to see progress!') }}</p>
                     </div>
                     <!-- Recipe matched -->
                     <div v-else class="w-full h-full flex justify-between">
@@ -881,7 +886,7 @@
                       <div class="w-[30%] h-full flex flex-col justify-between">
                         <div class="gap-1">
                           <p class="text-[#CAA580] text-lg">{{ inventory.craftRecipe.rewardLabel }}</p>
-                          <p class="text-[#898888] text-xs">To be crafted!</p>
+                          <p class="text-[#898888] text-xs">{{ uiText('craft_reward', 'Reward') }}</p>
                         </div>
                         <div class="w-[5vw] h-[5vw] rounded p-1 relative" style="background-color: rgba(255,138,5,0.06);">
                           <span class="absolute top-0.5 right-1 text-[10px] text-white/40">{{ inventory.craftRecipe.rewardAmount * inventory.craftAmount }}x</span>
@@ -898,7 +903,7 @@
                       <!-- Ingredients + craft button -->
                       <div class="w-[68%] h-full flex flex-col justify-between">
                         <div class="gap-1">
-                          <p class="text-[#CAA580] text-lg">Ingredients</p>
+                          <p class="text-[#CAA580] text-lg">{{ uiText('craft_ingredients', 'Ingredients') }}</p>
                           <p class="text-[#898888] text-xs">{{ inventory.craftRecipe.requiredItems.map(function(r) { return r.label }).join(', ') }}</p>
                         </div>
                         <div class="w-full h-[4vw] flex gap-1 overflow-x-auto overflow-y-hidden flex-nowrap">
@@ -911,11 +916,11 @@
                         </div>
                         <div class="w-full h-[2vw] flex justify-between items-center">
                           <div>
-                            <p class="text-[#CAA580] text-sm">Process Time</p>
+                            <p class="text-[#CAA580] text-sm">{{ uiText('craft_process_time', 'Process Time') }}</p>
                             <p class="text-[#898888] text-[0.55vw]">{{ (inventory.craftRecipe.timerForPerAmount / 1000).toFixed(0) }} seconds per one!</p>
                           </div>
                           <div @click="inventory.canCraft ? postNUI('StartCraft', { rewardName: inventory.craftRecipe.rewardName, amount: inventory.craftAmount }) : null" class="h-full px-2 flex justify-center text-xs font-semibold items-center bg-[url(./assets/craft-button-background.png)] cursor-pointer transition-all hover:opacity-70" :style="{ backgroundSize: '100% 100%', opacity: inventory.canCraft && !inventory.craftingInProgress ? 1 : 0.4, pointerEvents: inventory.canCraft && !inventory.craftingInProgress ? 'auto' : 'none' }">
-                            {{ inventory.craftingInProgress ? 'Crafting...' : 'Start Crafting!' }}
+                            {{ inventory.craftingInProgress ? uiText('craft_in_progress', 'Crafting...') : uiText('craft_start', 'Start Crafting') }}
                           </div>
                         </div>
                       </div>
@@ -927,7 +932,7 @@
               <!-- Second Inventory: clothing -->
               <div v-else-if="inventory.secondInventoryType === 'clothing'" key="clothing" class="w-full h-full flex flex-col justify-between items-center">
                   <div height="9%" class="p-2 flex justify-between items-center h-[9%] w-full bg-[url(./assets/header-background.png)]" style="background-size: 100% 100%;">
-                    <p class="text-xl">Clothing Menu</p>
+                    <p class="text-xl">{{ uiText('clothing_menu', 'Clothing Menu') }}</p>
                     <div class="w-[2vw] h-[2vw]  flex justify-center items-center rounded-md bg-black/10">
                         <img src="./assets/clothing-icon-big.png">
                     </div>
@@ -948,7 +953,7 @@
                             @click="onClothingClick(slot)"
                             class="w-[2.5vw] h-[2.5vw] shrink-0 bg-[url(./assets/clothing-menu-background.png)] flex justify-center items-center transition-all hover:opacity-70 cursor-pointer"
                             style="background-size: 100% 100%;"
-                            :title="slot.label"
+                            :title="uiText(slot.key, slot.label)"
                           >
                             <img :src="getAsset(slot.icon)" >
                           </div>
@@ -957,14 +962,14 @@
                       </template>
                   </div>
                   <div @click="inventory.secondInventoryType = inventory.secondInventoryType === 'clothing' ? (inventory.invType === 'main' ? 'drop' : 'inventory') : 'clothing'" class="w-full h-[5vh] flex justify-center items-center bg-[url(./assets/close-clothing-menu-background.png)] cursor-pointer transition-all hover:opacity-70" style="background-size: 100% 100%;">
-                      CLOSE CLOTHING MENU
+                      {{ uiText('close_clothing_menu', 'CLOSE CLOTHING MENU') }}
                   </div>
               </div>
 
               <!-- Drop Inventory -->
               <div v-else-if="inventory.secondInventoryType === 'drop'" key="drop" class="w-full h-full flex flex-col justify-between items-center">
                   <div class="p-2 flex justify-between items-center h-[9%] w-full bg-[url(./assets/header-background.png)]" style="background-size: 100% 100%;">
-                    <p class="text-xl">Ground{{ inventory.nearbyDropId ? ' - ' + inventory.nearbyDropId : '' }}</p>
+                    <p class="text-xl">{{ uiText('ground', 'Ground') }}{{ inventory.nearbyDropId ? ' - ' + inventory.nearbyDropId : '' }}</p>
                     <div class="w-[2vw] h-[2vw] flex justify-center items-center rounded-md bg-black/10">
                         <img src="./assets/inventory-icon.png">
                     </div>
@@ -974,7 +979,7 @@
                       <div class="weight-bar-fill" :style="{ width: (inventory.LuaConfig.DropInventory ? (inventory.dropCurrentWeight / inventory.LuaConfig.DropInventory.MaxWeight * 100) : 0) + '%' }"></div>
                     </div>
                     <div class="w-full flex justify-between items-center">
-                        <p class="text-sm text-[#BEB592]">Max Weight</p>
+                        <p class="text-sm text-[#BEB592]">{{ uiText('max_weight', 'Max Weight') }}</p>
                         <p class="text-sm text-[#BEB592]"><span class="font-semibold">{{ inventory.dropCurrentWeight }}</span>/{{ inventory.LuaConfig.DropInventory ? inventory.LuaConfig.DropInventory.MaxWeight : 100 }}{{ inventory.LuaConfig.WeightMeasure || 'kg' }}</p>
                     </div>
                   </div>
@@ -1020,7 +1025,7 @@
                     </div>
                   </template>
                   <div v-else class="w-full flex justify-center items-center p-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
-                    <p class="text-xs text-[#565353]">Empty</p>
+                    <p class="text-xs text-[#565353]">{{ uiText('empty', 'Empty') }}</p>
                   </div>
                 </div>
             </div>
@@ -1042,32 +1047,32 @@
                   <div class="w-full flex justify-between items-center">
                       <div class="gap-1 flex">
                         <img src="./assets/name-icon.png">
-                        <p class="text-[#4E4D4D]">Item Label</p>
+                        <p class="text-[#4E4D4D]">{{ uiText('item_label', 'Item Label') }}</p>
                       </div>
                       <p>{{ contextMenu.item.metadata?.label || contextMenu.item.custom_label || contextMenu.item.label }}</p>
                   </div>
                   <div class="w-full flex justify-between items-center">
                       <div class="gap-1 flex items-center">
                         <img src="./assets/weight-icon.png">
-                        <p class="text-[#4E4D4D]">Item Weight</p>
+                        <p class="text-[#4E4D4D]">{{ uiText('item_weight', 'Item Weight') }}</p>
                       </div>
                       <p>{{ (contextMenu.item.metadata?.weight || contextMenu.item.weight || 0) }}{{ inventory.LuaConfig.WeightMeasure || 'kg' }}</p>
                   </div>
                 </div>
                 <!-- Item Info (metadata / weapon fields) -->
                 <div v-if="hasItemInfo(contextMenu.item)" class="w-full flex flex-col mt-4 gap-1">
-                    <p>Item Info</p>
+                    <p>{{ uiText('item_info', 'Item Info') }}</p>
                     <div class="w-full h-px bg-black/20"></div>
                     <div v-if="contextMenu.item.serial_number" class="w-full flex justify-between items-center">
-                      <p>Serial Number</p>
+                      <p>{{ uiText('serial_number', 'Serial Number') }}</p>
                       <p class="text-[#565353]">{{ contextMenu.item.serial_number }}</p>
                     </div>
                     <div v-if="contextMenu.item.maxDegradation > 0" class="w-full flex justify-between items-center">
-                      <p>Durability</p>
+                      <p>{{ uiText('durability', 'Durability') }}</p>
                       <p :style="{ color: getDegradationColor(getDegradation(contextMenu.item)) }">{{ getDegradation(contextMenu.item).toFixed(0) }}%</p>
                     </div>
                     <div v-if="contextMenu.item.type === 'item_weapon' && contextMenu.item.durability != null" class="w-full flex justify-between items-center">
-                      <p>Durability</p>
+                      <p>{{ uiText('durability', 'Durability') }}</p>
                       <p :style="{ color: getDegradationColor(contextMenu.item.durability) }">{{ contextMenu.item.durability.toFixed(1) }}%</p>
                     </div>
                     <template v-if="contextMenu.item.metadata">
@@ -1082,7 +1087,7 @@
                 <!-- Description -->
                 <div v-if="getItemDesc(contextMenu.item)" class="mt-4 w-full flex flex-col gap-1">
                   <div class="w-full flex justify-between items-center">
-                      <p>Description</p>
+                      <p>{{ uiText('description', 'Description') }}</p>
                       <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center">
                         <img src="./assets/description-icon.png">
                       </div>
@@ -1092,7 +1097,7 @@
                 </div>
                 <!-- Weapon Components -->
                 <div v-if="getWeaponComponents(contextMenu.item).length > 0" class="mt-4 w-full flex flex-col gap-1">
-                  <p>Components</p>
+                  <p>{{ uiText('components', 'Components') }}</p>
                   <div class="w-full h-px bg-black/20"></div>
                   <div v-for="(c, ci) in getWeaponComponents(contextMenu.item)" :key="ci" class="w-full flex justify-between items-center">
                     <p class="text-xs text-[#4E4D4D]">{{ c.type || c.comp }}</p>
@@ -1119,10 +1124,10 @@
                   </div>
                   <div class="w-full flex gap-2">
                     <div @click="ammoPrompt.show = false" class="flex-1 h-[2.2vw] flex justify-center items-center cursor-pointer transition-all hover:opacity-70 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
-                      <p class="text-sm text-[#BEB592]">Cancel</p>
+                      <p class="text-sm text-[#BEB592]">{{ uiText('cancel', 'Cancel') }}</p>
                     </div>
                     <div @click="onAmmoPromptConfirm" class="flex-1 h-[2.2vw] flex justify-center items-center cursor-pointer transition-all hover:opacity-70 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
-                      <p class="text-sm text-[#BEB592]">Confirm</p>
+                      <p class="text-sm text-[#BEB592]">{{ uiText('confirm', 'Confirm') }}</p>
                     </div>
                   </div>
                 </div>
@@ -1135,7 +1140,7 @@
             <div v-if="inventory.showPlayerSelect" class="fixed inset-0 z-50 flex items-center justify-center" @click.self="onPlayerSelectClose">
               <div class="w-[17vw] bg-[url(./assets/context-background.png)] p-3 px-5 rounded flex flex-col gap-2 items-center" style="background-size: 100% 100%;" @click.stop>
                 <div class="w-full flex justify-between items-center">
-                  <p>Select Player</p>
+                  <p>{{ uiText('select_player', 'Select Player') }}</p>
                   <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center">
                     <img src="./assets/user-icon.png">
                   </div>
@@ -1153,7 +1158,7 @@
                   </div>
                 </div>
                 <div @click="onPlayerSelectClose" class="w-full h-[2.2vw] flex justify-center items-center cursor-pointer transition-all hover:opacity-70 bg-[url(./assets/buttons-background.png)] mt-1" style="background-size: 100% 100%;">
-                  <p class="text-sm text-[#BEB592]">Cancel</p>
+                  <p class="text-sm text-[#BEB592]">{{ uiText('cancel', 'Cancel') }}</p>
                 </div>
               </div>
             </div>
@@ -1195,7 +1200,7 @@
               :style="{ backgroundColor: n.type === 'remove' ? 'rgba(147, 91, 91, 0.38)' : n.type === 'used' ? 'rgba(100, 149, 237, 0.38)' : 'rgba(156, 178, 83, 0.38)' }"
             >
               <span class="absolute top-0.5 right-1 text-[8px] text-white/40">{{ n.count }}x</span>
-              <span class="absolute top-0.5 left-0.5 text-[7px] text-white/40">{{ n.type === 'remove' ? 'Removed' : n.type === 'used' ? 'Used' : 'Added' }}</span>
+              <span class="absolute top-0.5 left-0.5 text-[7px] text-white/40">{{ n.type === 'remove' ? uiText('notif_removed', 'Removed') : n.type === 'used' ? uiText('notif_used', 'Used') : uiText('notif_added', 'Added') }}</span>
               <img :src="getItemImage(n.name)" @error="onImgError" class="absolute inset-0 m-auto w-[40%] h-[60%] object-contain">
               <p class="absolute bottom-0.5 left-0 right-0 text-center text-[7px] text-white/70 truncate px-0.5">{{ n.label }}</p>
             </div>

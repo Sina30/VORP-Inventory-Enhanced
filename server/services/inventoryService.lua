@@ -364,14 +364,12 @@ function InventoryService.SecondSwapSlot(invId, fromSlot, toSlot)
 	local fromId, fromItem = findItemAtSlot(inv, fromSlot)
 	local toId, toItem = findItemAtSlot(inv, toSlot)
 	if not fromItem then return end
-	local user = Core.getUser(_source)
-	local charId = user.getUsedCharacter.charIdentifier
 
 	fromItem:setSlot(toSlot)
-	DBService.UpdateItemSlot(charId, fromItem:getId(), toSlot)
+	DBService.UpdateCustomInventoryItemSlot(invId, fromItem:getId(), toSlot)
 	if toItem then
 		toItem:setSlot(fromSlot)
-		DBService.UpdateItemSlot(charId, toItem:getId(), fromSlot)
+		DBService.UpdateCustomInventoryItemSlot(invId, toItem:getId(), fromSlot)
 	end
 	InventoryService.reloadInventory(_source, invId)
 end
@@ -384,19 +382,18 @@ function InventoryService.SecondMergeSlot(invId, fromSlot, toSlot, amount)
 	local toId, toItem = findItemAtSlot(inv, toSlot)
 	if not fromItem or not toItem then return end
 	if not canStackInventoryItems(fromItem, toItem) then return end
-	local user = Core.getUser(_source)
-	local charId = user.getUsedCharacter.charIdentifier
 
-	local moveAmount = math.min(amount, fromItem:getCount())
+	local moveAmount = math.min(tonumber(amount) or fromItem:getCount(), fromItem:getCount())
+	if moveAmount <= 0 then return end
 	toItem:addCount(moveAmount, true)
 	fromItem:quitCount(moveAmount)
 
-	DBService.SetItemAmount(charId, toItem:getId(), toItem:getCount())
+	DBService.SetCustomInventoryItemAmount(invId, toItem:getId(), toItem:getCount())
 	if fromItem:getCount() <= 0 then
-		DBService.DeleteItem(charId, fromItem:getId())
+		DBService.DeleteCustomInventoryItem(invId, fromItem:getId())
 		inv[fromId] = nil
 	else
-		DBService.SetItemAmount(charId, fromItem:getId(), fromItem:getCount())
+		DBService.SetCustomInventoryItemAmount(invId, fromItem:getId(), fromItem:getCount())
 	end
 	InventoryService.reloadInventory(_source, invId)
 end
@@ -411,11 +408,11 @@ function InventoryService.SecondSplitSlot(invId, fromSlot, toSlot, amount)
 	local user = Core.getUser(_source)
 	local charId = user.getUsedCharacter.charIdentifier
 
-	local moveAmount = math.min(amount, fromItem:getCount())
+	local moveAmount = math.min(tonumber(amount) or 0, fromItem:getCount())
 	if moveAmount <= 0 or moveAmount >= fromItem:getCount() then return end
 
 	fromItem:quitCount(moveAmount)
-	DBService.SetItemAmount(charId, fromItem:getId(), fromItem:getCount())
+	DBService.SetCustomInventoryItemAmount(invId, fromItem:getId(), fromItem:getCount())
 
 	local svItem = ServerItems[fromItem:getName()]
 	if not svItem then return end

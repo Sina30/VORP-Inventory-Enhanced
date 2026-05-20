@@ -192,7 +192,13 @@ function Weapon:equipwep()
 		local ammotypes = SharedData.AmmoTypes and SharedData.AmmoTypes[weaponGroup]
 		if ammotypes then
 			for ammo_name, _ in pairs(ammotypes) do
-				local qty = self.ammo and self.ammo[ammo_name]
+				local qty = nil
+				if isWeaponBow and PlayerAmmoInfo and PlayerAmmoInfo.ammo then
+					qty = PlayerAmmoInfo.ammo[ammo_name]
+				end
+				if not qty or qty == 0 then
+					qty = self.ammo and self.ammo[ammo_name]
+				end
 				if (not qty or qty == 0) and PlayerAmmoInfo and PlayerAmmoInfo.ammo then
 					qty = PlayerAmmoInfo.ammo[ammo_name]
 				end

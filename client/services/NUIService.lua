@@ -357,6 +357,18 @@ local function addWardrobeInventoryItem(itemName, slotHash)
 	return equipped;
 end
 
+local function hasOtherUsedOneHandedWeapon(currentWeaponId)
+	for _, weapon in pairs(UserWeapons) do
+		if tonumber(weapon:getId()) ~= currentWeaponId and (weapon:getUsed() or weapon:getUsed2()) then
+			local otherHash = joaat(weapon:getName())
+			if Citizen.InvokeNative(0x705BE297EEBDB95D, otherHash) and Citizen.InvokeNative(0xD955FEE4B87AFA07, otherHash) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 local function useWeapon(data)
 	data.type = data.type or "item_weapon"
 	local ped = PlayerPedId()
@@ -375,20 +387,21 @@ local function useWeapon(data)
 	local isWeaponBow = weaponGroup == joaat("GROUP_BOW")
 	local isWeaponAGun = Citizen.InvokeNative(0x705BE297EEBDB95D, weapName)
 	local isWeaponOneHanded = Citizen.InvokeNative(0xD955FEE4B87AFA07, weapName)
-	local isArmed = Citizen.InvokeNative(0xCB690F680A3EA971, ped, 4)
+	local hasCurrentWeapon = weaponHash and weaponHash ~= 0 and weaponHash ~= `WEAPON_UNARMED`
 	local notdual = false
 	local canOneHandDualWield = isWeaponAGun and isWeaponOneHanded
+	local hasOtherDualWeapon = canOneHandDualWield and hasOtherUsedOneHandedWeapon(weaponId)
 	local hasWeapon = Citizen.InvokeNative(0x8DECB02F88F428BC, ped, weapName, 0, true)
 	local isWeaponThrowable = Citizen.InvokeNative(0x30E7C16B12DA8211, weapName)
 	local shouldEquipWeapon = (not UserWeapons[weaponId]:getUsed() and not hasWeapon) or isWeaponBow or isWeaponThrowable
-	if canOneHandDualWield and isArmed and not Config.DuelWield then
+	if canOneHandDualWield and hasCurrentWeapon and not Config.DuelWield then
 		return
 	elseif canOneHandDualWield and Config.DuelWield and not UserWeapons[weaponId]:getUsed() then
 		addWardrobeInventoryItem("CLOTHING_ITEM_M_OFFHAND_000_TINT_004", 0xF20B6B4A)
 		addWardrobeInventoryItem("UPGRADE_OFFHAND_HOLSTER", 0x39E57B01)
 
-		if isArmed and weaponHash ~= weapName then
-			UserWeapons[weaponId]:setUsed2(true)
+		if (hasCurrentWeapon and weaponHash ~= weapName) or hasOtherDualWeapon then
+			UserWeapons[weaponId].used2 = true
 		end
 
 		UserWeapons[weaponId]:equipwep()
@@ -415,17 +428,16 @@ local function useWeapon(data)
 		-- Restore ammo to ped from weapon's own ammo first, then from player ammo cache
 		local weaponAmmo = UserWeapons[weaponId]:getAllAmmo() or {}
 		for type, amount in pairs(weaponAmmo) do
-			if amount and amount > 0 then
+			if amount and amount > 0 and not isWeaponBow then
 				SetPedAmmoByType(ped, joaat(type), amount)
 			end
 		end
 		if PlayerAmmoInfo and PlayerAmmoInfo.ammo then
-			local wepgroup = GetWeapontypeGroup(weapName)
-			local ammotypes = SharedData.AmmoTypes and SharedData.AmmoTypes[wepgroup]
+			local ammotypes = SharedData.AmmoTypes and SharedData.AmmoTypes[weaponGroup]
 			if ammotypes then
 				for ammo_name, _ in pairs(ammotypes) do
 					local qty = PlayerAmmoInfo.ammo[ammo_name]
-					if qty and qty > 0 and (not weaponAmmo[ammo_name] or weaponAmmo[ammo_name] == 0) then
+					if qty and qty > 0 and (isWeaponBow or not weaponAmmo[ammo_name] or weaponAmmo[ammo_name] == 0) then
 						SetPedAmmoByType(ped, joaat(ammo_name), qty)
 					end
 				end
@@ -765,7 +777,8 @@ function NUIService.initiateData()
 			give = T("give"),
 			drop = T("drop"),
 			copyserial = T("copyserial"),
-			labels = T("labels")
+			labels = T("labels"),
+			ui = T("ui")
 		},
 		config = {
 			UseGoldItem = Config.UseGoldItem,
