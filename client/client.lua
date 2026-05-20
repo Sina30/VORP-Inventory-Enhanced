@@ -64,7 +64,7 @@ CreateThread(function()
 
         if not InInventory then
             for _, hotkey in ipairs(hotbarControls) do
-                if IsDisabledControlJustPressed(0, hotkey.control) then
+                if not pressedSlot and IsDisabledControlJustPressed(0, hotkey.control) then
                     pressedSlot = hotkey.slot
                     pressedAt = GetGameTimer()
                     holdHandled = false
@@ -79,10 +79,8 @@ CreateThread(function()
                     local heldLongEnough = (GetGameTimer() - pressedAt) >= hotbarHoldMs
                     if not holdHandled then
                         if heldLongEnough then
-                            print("Hotbar slot " .. hotkey.slot .. " held, but not handled. Holstering as fallback.")
                             NUIService.HolsterHotbarSlot(pressedSlot)
                         else
-                            print("Hotbar slot " .. hotkey.slot .. " tapped. Using item.")
                             NUIService.UseHotbarSlot(pressedSlot)
                         end
                     end

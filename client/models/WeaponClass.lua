@@ -207,8 +207,11 @@ function Weapon:equipwep()
 		ammoCount = 1
 	end
 
-	if isWeaponMelee or isWeaponThrowable or isWeaponPetrolCan then
+	if isWeaponMelee or isWeaponThrowable or isWeaponBow or isWeaponPetrolCan then
 		GiveDelayedWeaponToPed(playerPedId, weaponHash_0, ammoCount, true, 0)
+		if isWeaponBow then
+			SetCurrentPedWeapon(playerPedId, weaponHash_0, false, 0, false, false)
+		end
 	else
 		if self.used2 then
 			if isWeaponAGun and isWeaponOneHanded then

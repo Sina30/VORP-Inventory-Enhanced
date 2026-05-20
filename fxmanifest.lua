@@ -51,4 +51,4 @@ ui_page 'ui/index.html'
 server_exports { 'vorp_inventoryApi' }
 
 
-version '1.0.8'
+version '1.0.9'

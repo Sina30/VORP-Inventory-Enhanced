@@ -371,11 +371,16 @@ local function useWeapon(data)
 		return
 	end
 	local weapName = joaat(UserWeapons[weaponId]:getName())
+	local weaponGroup = GetWeapontypeGroup(weapName)
+	local isWeaponBow = weaponGroup == joaat("GROUP_BOW")
 	local isWeaponAGun = Citizen.InvokeNative(0x705BE297EEBDB95D, weapName)
 	local isWeaponOneHanded = Citizen.InvokeNative(0xD955FEE4B87AFA07, weapName)
 	local isArmed = Citizen.InvokeNative(0xCB690F680A3EA971, ped, 4)
 	local notdual = false
 	local canOneHandDualWield = isWeaponAGun and isWeaponOneHanded
+	local hasWeapon = Citizen.InvokeNative(0x8DECB02F88F428BC, ped, weapName, 0, true)
+	local isWeaponThrowable = Citizen.InvokeNative(0x30E7C16B12DA8211, weapName)
+	local shouldEquipWeapon = (not UserWeapons[weaponId]:getUsed() and not hasWeapon) or isWeaponBow or isWeaponThrowable
 	if canOneHandDualWield and isArmed and not Config.DuelWield then
 		return
 	elseif canOneHandDualWield and Config.DuelWield and not UserWeapons[weaponId]:getUsed() then
@@ -390,7 +395,7 @@ local function useWeapon(data)
 		UserWeapons[weaponId]:loadComponents()
 		UserWeapons[weaponId]:setUsed(true)
 		TriggerServerEvent("syn_weapons:weaponused", data)
-	elseif not UserWeapons[weaponId]:getUsed() and not Citizen.InvokeNative(0x8DECB02F88F428BC, ped, weapName, 0, true) or Citizen.InvokeNative(0x30E7C16B12DA8211, weapName) then
+	elseif shouldEquipWeapon then
 		notdual = true
 	end
 
