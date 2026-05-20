@@ -35,11 +35,7 @@ if Config.DevMode then
     end)
 end
 
-local hotbarHoldMs = 350
-local hotbarKeyState = {}
-local hotbarReleaseGraceMs = 80
-
-local function isHotbarControlDown(controls)
+local function isControlDown(controls)
     for _, control in ipairs(controls) do
         for _, padIndex in ipairs({ 0, 2 }) do
             if IsDisabledControlPressed(padIndex, control) or IsControlPressed(padIndex, control) then
@@ -63,11 +59,23 @@ local function isHotbarControlDown(controls)
     return false
 end
 
-local function clearHotbarKeyState()
-    for slot = 1, 5 do
-        hotbarKeyState[slot] = nil
+local function isControlJustPressed(controls)
+    for _, control in ipairs(controls) do
+        for _, padIndex in ipairs({ 0, 2 }) do
+            if IsDisabledControlJustPressed(padIndex, control) or IsControlJustPressed(padIndex, control) then
+                return true
+            end
+        end
     end
+
+    return false
 end
+
+local hotbarModifierControls = {
+    0x8FFC75D6, -- INPUT_SPRINT / Left Shift
+    0x0F39B3D4, -- INPUT_SELECT_RADAR_MODE / Left Alt
+    0xE8342FF2, -- INPUT_MULTIPLAYER_INFO / Left Alt
+}
 
 -- Hotbar toggle with Tab and suppress native weapon-slot controls.
 CreateThread(function()
@@ -96,46 +104,13 @@ CreateThread(function()
             SendNUIMessage({ action = "toggleHotbar" })
         end
 
-        if InInventory then
-            clearHotbarKeyState()
-        else
-            local now = GetGameTimer()
-
+        if not InInventory then
             for _, hotkey in ipairs(hotbarControls) do
-                local slot = hotkey.slot
-                local isDown = isHotbarControlDown(hotkey.controls)
-                local state = hotbarKeyState[slot]
-
-                if isDown then
-                    if not state then
-                        state = {
-                            pressedAt = now,
-                            handled = false,
-                            releasedAt = nil,
-                        }
-                        hotbarKeyState[slot] = state
+                if isControlJustPressed(hotkey.controls) then
+                    if isControlDown(hotbarModifierControls) then
+                        NUIService.HolsterHotbarSlot(hotkey.slot)
                     else
-                        state.releasedAt = nil
-                    end
-
-                    if not state.handled and (now - state.pressedAt) >= hotbarHoldMs then
-                        NUIService.HolsterHotbarSlot(slot)
-                        state.handled = true
-                    end
-                elseif state then
-                    state.releasedAt = state.releasedAt or now
-
-                    if (now - state.releasedAt) >= hotbarReleaseGraceMs then
-                        if not state.handled then
-                            local heldLongEnough = (state.releasedAt - state.pressedAt) >= hotbarHoldMs
-                            if heldLongEnough then
-                                NUIService.HolsterHotbarSlot(slot)
-                            else
-                                NUIService.UseHotbarSlot(slot)
-                            end
-                        end
-
-                        hotbarKeyState[slot] = nil
+                        NUIService.UseHotbarSlot(hotkey.slot)
                     end
                 end
             end
