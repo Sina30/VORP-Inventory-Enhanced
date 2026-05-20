@@ -39,8 +39,6 @@ Config = {
 
 	OpenKey                        = 0xC1989F95, -- I
 
-	HolsterKey                     = 0x26E9DC00, -- Z by default. Change this to another RedM control hash if needed.
-
 	discordid                      = true,    -- Turn to true if ur using discord whitelist
 
 	DeleteOnlyDontDrop             = false,   -- If true then dropping items only deletes from inventory and box on the floor is not created
@@ -62,6 +60,11 @@ Config = {
 	DropInventory                  = {
 		MaxWeight = 50.0, -- Max weight for drop inventory
 		Slots = 35, -- Number of slots in drop inventory
+		UsePropMarker = true, -- If true, spawn a prop instead of drawing the marker below
+		PropMarker = {
+			Model = "p_cottonbox01x",
+			ZOffset = -1.0,
+		},
 		Marker = {
 			Sprite = 0x6903B113, -- Marker type hash (halo)
 			Scale = { x = 0.8, y = 0.8, z = 0.3 }, -- Marker size

@@ -48,6 +48,10 @@
     return item && (item.type === 'item_money' || item.type === 'item_gold')
   }
 
+  function isEquippedWeapon(item) {
+    return item && item.type === 'item_weapon' && (item.used || item.used2)
+  }
+
   function getTransferAmount(item) {
     var amount = Number(transferAmount.value)
     var max = Number(item.count) || 0
@@ -324,6 +328,7 @@
     if (dragSource.value === 'player') {
       var item = inventory.getItemAtSlot(dragFrom.value)
       if (item) {
+        if (isEquippedWeapon(item)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
         // Block if target slot has different item
         var targetDropItem = inventory.getDropZoneItemAtSlot(toSlot)
         if (targetDropItem && !canStackItems(item, targetDropItem)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
@@ -364,6 +369,7 @@
     if (dragSource.value !== 'player') { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
     var item = inventory.getItemAtSlot(dragFrom.value)
     if (!item) { dragFrom.value = null; dragGhost.value.show = false; return }
+    if (isEquippedWeapon(item)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
     if (item.locked && item.type !== 'item_money' && item.type !== 'item_gold') { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
 
     var amount = getTransferAmount(item)
@@ -437,6 +443,7 @@
     if (dragSource.value === 'player') {
       var item = inventory.getItemAtSlot(dragFrom.value)
       if (item) {
+        if (isEquippedWeapon(item)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
         var targetCraftItem = inventory.getCraftItemAtSlot(toSlot)
         if (targetCraftItem && !canStackItems(item, targetCraftItem)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
         var amount = getTransferAmount(item)
@@ -599,6 +606,7 @@
     if (dragSource.value === 'player') {
       var item = inventory.getItemAtSlot(dragFrom.value)
       if (item) {
+        if (isEquippedWeapon(item)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
         var targetSecItem = inventory.getSecondItemAtSlot(toSlot)
         // Steal: swap when different items
         if (inventory.invType === 'steal' && targetSecItem && !canStackItems(item, targetSecItem)) {

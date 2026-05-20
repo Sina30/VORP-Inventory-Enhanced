@@ -269,12 +269,60 @@ RegisterNetEvent("vorpInventory:shareGoldPickupClient", PickupsService.shareGold
 
 -- DropLocations sync from server
 local ClientDropLocations = {}
+local ClientDropLocationProps = {}
+
+local function deleteDropLocationProp(dropId)
+	local entity = ClientDropLocationProps[dropId]
+	if entity and DoesEntityExist(entity) then
+		DeleteEntity(entity)
+	end
+	ClientDropLocationProps[dropId] = nil
+end
+
+local function deleteAllDropLocationProps()
+	for dropId, _ in pairs(ClientDropLocationProps) do
+		deleteDropLocationProp(dropId)
+	end
+end
+
+local function shouldUseDropPropMarker()
+	return Config.DropInventory and Config.DropInventory.UsePropMarker == true
+end
+
+local function createDropLocationProp(dropId, coords)
+	if ClientDropLocationProps[dropId] and DoesEntityExist(ClientDropLocationProps[dropId]) then return end
+
+	local propConfig = Config.DropInventory and Config.DropInventory.PropMarker or {}
+	local model = propConfig.Model or Config.spawnableProps.default_box
+	local zOffset = propConfig.ZOffset or -1.0
+	PickupsService.loadModel(model)
+
+	local entity = CreateObject(joaat(model), coords.x, coords.y, coords.z + zOffset, false, false, false, false)
+	repeat Wait(0) until DoesEntityExist(entity)
+	PlaceObjectOnGroundProperly(entity, false)
+	FreezeEntityPosition(entity, true)
+	SetEntityCollision(entity, false, true)
+	SetModelAsNoLongerNeeded(model)
+	ClientDropLocationProps[dropId] = entity
+end
 
 function PickupsService.syncDropLocations(data)
+	local seenDropIds = {}
 	ClientDropLocations = {}
 	for _, loc in ipairs(data) do
+		seenDropIds[loc.dropId] = true
 		ClientDropLocations[loc.dropId] = { coords = loc.coords, slots = loc.slots }
+		if shouldUseDropPropMarker() then
+			createDropLocationProp(loc.dropId, loc.coords)
+		end
 	end
+
+	for dropId, _ in pairs(ClientDropLocationProps) do
+		if not seenDropIds[dropId] or not shouldUseDropPropMarker() then
+			deleteDropLocationProp(dropId)
+		end
+	end
+
 	-- If inventory is open, update NUI
 	if InInventory then
 		PickupsService.sendNearbyDropsToNUI()
@@ -372,14 +420,16 @@ CreateThread(function()
 		local playerCoords = GetEntityCoords(playerPed, true, true)
 
 		-- Draw markers from dropId locations
-		for dropId, loc in pairs(ClientDropLocations) do
-			local dist = #(playerCoords - loc.coords)
-			local m = Config.DropInventory and Config.DropInventory.Marker or {}
-			if dist <= (m.DrawDistance or 5.0) then
-				sleep = 0
-				local s = m.Scale or {}
-				local c = m.Color or {}
-				DrawMarker(m.Sprite or 0x94FDAE17, loc.coords.x, loc.coords.y, loc.coords.z - 0.95, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, s.x or 0.8, s.y or 0.8, s.z or 0.3, c.r or 202, c.g or 165, c.b or 128, c.a or 120, false, false, 0, true, false, false, false)
+		if not shouldUseDropPropMarker() then
+			for dropId, loc in pairs(ClientDropLocations) do
+				local dist = #(playerCoords - loc.coords)
+				local m = Config.DropInventory and Config.DropInventory.Marker or {}
+				if dist <= (m.DrawDistance or 5.0) then
+					sleep = 0
+					local s = m.Scale or {}
+					local c = m.Color or {}
+					DrawMarker(m.Sprite or 0x94FDAE17, loc.coords.x, loc.coords.y, loc.coords.z - 0.95, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, s.x or 0.8, s.y or 0.8, s.z or 0.3, c.r or 202, c.g or 165, c.b or 128, c.a or 120, false, false, 0, true, false, false, false)
+				end
 			end
 		end
 
@@ -391,6 +441,7 @@ end)
 -- for debug
 AddEventHandler("onResourceStop", function(resourceName)
 	if GetCurrentResourceName() ~= resourceName then return end
+	deleteAllDropLocationProps()
 	if not Config.DevMode then return end
 	--delete all entities
 	for key, value in pairs(WorldPickups) do

@@ -642,6 +642,41 @@ function NUIService.UseHotbarSlot(slotNum)
 	end
 end
 
+function NUIService.HolsterHotbarSlot(slotNum)
+	local allItems = loadItemsAndWeapons()
+
+	local usedSlots = {}
+	for _, item in ipairs(allItems) do
+		if item.slot then usedSlots[item.slot] = true end
+	end
+	local nextSlot = 1
+	for _, item in ipairs(allItems) do
+		if not item.slot then
+			while usedSlots[nextSlot] do nextSlot = nextSlot + 1 end
+			item.slot = nextSlot
+			usedSlots[nextSlot] = true
+		end
+	end
+
+	for _, item in ipairs(allItems) do
+		if item.slot == slotNum and item.type == "item_weapon" then
+			local weaponId = tonumber(item.id)
+			local weapon = weaponId and UserWeapons[weaponId]
+			if not weapon or not (weapon:getUsed() or weapon:getUsed2()) then return end
+
+			local ped = PlayerPedId()
+			local weaponHash = joaat(weapon:getName())
+			local _, currentWeapon = GetCurrentPedWeapon(ped, false, 0, false)
+			if currentWeapon == weaponHash then
+				SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true, 0, false, false)
+			else
+				SetCurrentPedWeapon(ped, weaponHash, false, 0, false, false)
+			end
+			return
+		end
+	end
+end
+
 function NUIService.SendHotbarItems()
 	local itemsAndWeapons = loadItemsAndWeapons()
 	SendNUIMessage({
@@ -926,6 +961,10 @@ function NUIService.NUIUpdateSlot(data, cb)
 		local id = tonumber(data.itemId)
 		if data.itemType == "item_weapon" then
 			if id and UserWeapons[id] then
+				if UserWeapons[id]:getUsed() or UserWeapons[id]:getUsed2() then
+					if cb then cb('ok') end
+					return
+				end
 				UserWeapons[id]:setSlot(data.slot)
 			end
 		else

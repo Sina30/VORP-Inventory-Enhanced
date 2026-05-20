@@ -49,6 +49,10 @@ function canStackItems(a, b) {
   return true
 }
 
+function isEquippedWeapon(item) {
+  return item && item.type === 'item_weapon' && (item.used || item.used2)
+}
+
 export const useInventoryStore = defineStore('inventory', () => {
   const items = ref([])
   const playerInventory = ref([])
@@ -527,6 +531,8 @@ export const useInventoryStore = defineStore('inventory', () => {
     // Locked items (money/gold) can't be moved
     if (fromItem.locked) return
     if (toItem && toItem.locked) return
+    if (isEquippedWeapon(fromItem)) return
+    if (isEquippedWeapon(toItem)) return
 
     var moveAmount = amount || fromItem.count
     if (moveAmount > fromItem.count) moveAmount = fromItem.count

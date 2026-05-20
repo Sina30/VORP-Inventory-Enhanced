@@ -9,27 +9,6 @@ AddEventHandler('onClientResourceStart', function(resourceName)
 end)
 
 local CraftPeds = {}
-local lastHolsteredWeapon = nil
-
-local function toggleHolsterWeapon()
-    local ped = PlayerPedId()
-    local _, weaponHash = GetCurrentPedWeapon(ped, false, 0, false)
-    if not weaponHash or weaponHash == 0 or weaponHash == `WEAPON_UNARMED` then
-        weaponHash = GetPedCurrentHeldWeapon(ped)
-    end
-
-    if not weaponHash or weaponHash == 0 or weaponHash == `WEAPON_UNARMED` then
-        if lastHolsteredWeapon and lastHolsteredWeapon ~= 0 and lastHolsteredWeapon ~= `WEAPON_UNARMED` then
-            SetCurrentPedWeapon(ped, lastHolsteredWeapon, false, 0, false, false)
-            return true
-        end
-        return false
-    end
-
-    lastHolsteredWeapon = weaponHash
-    SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true, 0, false, false)
-    return true
-end
 
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
@@ -60,22 +39,22 @@ end
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
     local tabControl = 0xB238FE0B
-    local holsterControl = Config.HolsterKey
+    local hotbarHoldMs = 350
+    local pressedSlot = nil
+    local pressedAt = 0
+    local holdHandled = false
     local hotbarControls = {
-        tabControl,
-        holsterControl,
-        0xE6F612E4,
-        0x1CE6D9EB,
-        0xAE69478F,
-        0x8F9F9E58,
-        0xAB62E997,
+        { control = 0xE6F612E4, slot = 1 },
+        { control = 0x1CE6D9EB, slot = 2 },
+        { control = 0xAE69478F, slot = 3 },
+        { control = 0x8F9F9E58, slot = 4 },
+        { control = 0xAB62E997, slot = 5 },
     }
     while true do
         Wait(0)
-        for _, control in ipairs(hotbarControls) do
-            if control then
-                DisableControlAction(0, control, true)
-            end
+        DisableControlAction(0, tabControl, true)
+        for _, hotkey in ipairs(hotbarControls) do
+            DisableControlAction(0, hotkey.control, true)
         end
 
         if IsDisabledControlJustPressed(0, tabControl) then
@@ -84,16 +63,31 @@ CreateThread(function()
         end
 
         if not InInventory then
-            if holsterControl and IsDisabledControlJustPressed(0, holsterControl) then
-                toggleHolsterWeapon()
-            end
+            for _, hotkey in ipairs(hotbarControls) do
+                if IsDisabledControlJustPressed(0, hotkey.control) then
+                    pressedSlot = hotkey.slot
+                    pressedAt = GetGameTimer()
+                    holdHandled = false
+                end
 
-            if IsDisabledControlJustPressed(0, 0xE6F612E4) then NUIService.UseHotbarSlot(1)
-            elseif IsDisabledControlJustPressed(0, 0x1CE6D9EB) then NUIService.UseHotbarSlot(2)
-            elseif IsDisabledControlJustPressed(0, 0xAE69478F) then NUIService.UseHotbarSlot(3)
-            elseif IsDisabledControlJustPressed(0, 0x8F9F9E58) then NUIService.UseHotbarSlot(4)
-            elseif IsDisabledControlJustPressed(0, 0xAB62E997) then NUIService.UseHotbarSlot(5)
+                if pressedSlot == hotkey.slot and IsDisabledControlPressed(0, hotkey.control) and not holdHandled and (GetGameTimer() - pressedAt) >= hotbarHoldMs then
+                    NUIService.HolsterHotbarSlot(pressedSlot)
+                    holdHandled = true
+                end
+
+                if pressedSlot == hotkey.slot and IsDisabledControlJustReleased(0, hotkey.control) then
+                    if not holdHandled then
+                        NUIService.UseHotbarSlot(pressedSlot)
+                    end
+                    pressedSlot = nil
+                    pressedAt = 0
+                    holdHandled = false
+                end
             end
+        else
+            pressedSlot = nil
+            pressedAt = 0
+            holdHandled = false
         end
     end
 end)

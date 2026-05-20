@@ -858,6 +858,10 @@ function InventoryService.UpdateSlot(itemId, slot, itemType)
 
 	if itemType == "item_weapon" then
 		local numId = tonumber(itemId)
+		if UsersWeapons.default then
+			local weapon = UsersWeapons.default[numId] or UsersWeapons.default[itemId]
+			if weapon and (weapon:getUsed() or weapon:getUsed2()) then return end
+		end
 		DBService.UpdateWeaponSlot(itemId, slot)
 		if UsersWeapons.default then
 			if UsersWeapons.default[numId] then
