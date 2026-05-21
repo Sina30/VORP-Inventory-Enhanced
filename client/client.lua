@@ -59,16 +59,34 @@ local function isControlJustPressed(controls)
     return false
 end
 
+-- Hold Left Shift while pressing a hotbar slot key to holster instead of use.
+-- The two ALT controls that used to be here read as permanently pressed, which
+-- made every hotbar key press holster instead of using the item.
 local hotbarModifierControls = {
     0x8FFC75D6, -- INPUT_SPRINT / Left Shift
-    0x0F39B3D4, -- INPUT_SELECT_RADAR_MODE / Left Alt
-    0xE8342FF2, -- INPUT_MULTIPLAYER_INFO / Left Alt
 }
 
--- Hotbar toggle with Tab and suppress native weapon-slot controls.
+-- Hotbar toggle. Several detection paths all feed one debounced toggle, so it
+-- works no matter which input method the client supports (key mapping, raw
+-- key, or the native control). The debounce stops a double-toggle when more
+-- than one path fires for the same press.
+local lastHotbarToggle = 0
+local function toggleHotbar()
+    if GetGameTimer() - lastHotbarToggle < 250 then return end
+    lastHotbarToggle = GetGameTimer()
+    print("^2[vorp_inventory]^7 Hotbar toggled.")
+    SendNUIMessage({ action = "toggleHotbar" })
+    pcall(NUIService.SendHotbarItems)
+end
+
+RegisterCommand("vorp_toggle_hotbar", function() toggleHotbar() end, false)
+
+-- Suppress native weapon-slot controls and run hotbar quick-use keys.
 CreateThread(function()
     repeat Wait(2000) until LocalPlayer.state.IsInSession
+    print("^2[vorp_inventory]^7 Hotbar controls active.")
     local tabControl = 0xB238FE0B
+    print("^2[vorp_inventory]^7 Suppressing native weapon wheel controls (default TAB and 1-5).")
     local hotbarControls = {
         { controls = { 0xE6F612E4 }, slot = 1 },
         { controls = { 0x1CE6D9EB }, slot = 2 },
@@ -76,6 +94,12 @@ CreateThread(function()
         { controls = { 0x8F9F9E58 }, slot = 4 },
         { controls = { 0xAB62E997 }, slot = 5 },
     }
+
+    -- VK_TAB = 0x09. We track the held state ourselves so we get a clean
+    -- "just pressed" edge on every press, independent of native control timing.
+    local VK_TAB = 0x09
+    local tabWasDown = false
+
     while true do
         Wait(0)
         DisableControlAction(0, tabControl, true)
@@ -87,17 +111,23 @@ CreateThread(function()
             end
         end
 
-        if IsDisabledControlJustPressed(0, tabControl) then
-            NUIService.SendHotbarItems()
-            SendNUIMessage({ action = "toggleHotbar" })
+        -- Manual edge detection on the raw TAB key: fire toggleHotbar() only
+        -- on the transition from up -> down, so each press flips open/close.
+        local tabDownNow = IsRawKeyPressed and IsRawKeyPressed(VK_TAB)
+        if tabDownNow and not tabWasDown then
+            toggleHotbar()
         end
+        tabWasDown = tabDownNow
 
         if not InInventory then
             for _, hotkey in ipairs(hotbarControls) do
                 if isControlJustPressed(hotkey.controls) then
+                    print(("Hotbar slot %d pressed (controls: %s)"):format(hotkey.slot, table.concat(hotkey.controls, ", ")))
                     if isControlDown(hotbarModifierControls) then
+                        print(("Modifier key held, holstering slot %d instead of using it."):format(hotkey.slot))
                         NUIService.HolsterHotbarSlot(hotkey.slot)
                     else
+                        print(("Using hotbar slot %d"):format(hotkey.slot))
                         NUIService.UseHotbarSlot(hotkey.slot)
                     end
                 end

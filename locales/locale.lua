@@ -108,6 +108,9 @@ Locales['en'] = {
     to                        = "to",
     of                        = "of",
 
+    movedToStorage            = "Moved to storage",
+    takenFromStorage          = "Taken from storage",
+
     ui = {
         -- Header / general
         inventory_title           = "Inventory",
@@ -175,6 +178,25 @@ Locales['en'] = {
         ground                    = "Ground",
         max_weight                = "Max Weight",
         no_drops_nearby           = "No drops nearby",
+
+        -- Weapon registry
+        weapon_registry           = "Weapon Registry",
+        check_serial              = "Check a Serial Number",
+        search                    = "Search",
+        registered_to             = "Registered to",
+        registered_by             = "Registered by",
+        serial_not_registered     = "That serial number is not registered.",
+        nearby_players            = "Nearby Players",
+        refresh                   = "Refresh",
+        weapons                   = "weapons",
+        no_weapons                = "No weapons on this player",
+        no_serial                 = "none",
+        unregistered              = "Unregistered",
+        register                  = "Register",
+        no_players_nearby         = "No players nearby",
+        close                     = "Close",
+        worn                      = "Worn",
+        copied                    = "Copied!",
     },
 }
 
@@ -256,6 +278,9 @@ Locales['tr'] = {
         decay = "Bozulma ",
     },
 
+    movedToStorage            = "Depoya taşındı",
+    takenFromStorage          = "Depodan alındı",
+
     ui = {
         inventory_title           = "Envanter",
         weight                    = "Ağırlık",
@@ -313,6 +338,25 @@ Locales['tr'] = {
         ground                    = "Yer",
         max_weight                = "Maks Ağırlık",
         no_drops_nearby           = "Yakında düşürülmüş eşya yok",
+
+        -- Weapon registry
+        weapon_registry           = "Silah Kaydı",
+        check_serial              = "Seri Numarası Sorgula",
+        search                    = "Ara",
+        registered_to             = "Kayıtlı sahibi",
+        registered_by             = "Kaydeden",
+        serial_not_registered     = "Bu seri numarası kayıtlı değil.",
+        nearby_players            = "Yakındaki Oyuncular",
+        refresh                   = "Yenile",
+        weapons                   = "silah",
+        no_weapons                = "Bu oyuncuda silah yok",
+        no_serial                 = "yok",
+        unregistered              = "Kayıtsız",
+        register                  = "Kaydet",
+        no_players_nearby         = "Yakında oyuncu yok",
+        close                     = "Kapat",
+        worn                      = "Giyili",
+        copied                    = "Kopyalandı!",
     },
 }
 
@@ -394,6 +438,9 @@ Locales['fr'] = {
         decay = "Détérioration ",
     },
 
+    movedToStorage            = "Moved to storage",
+    takenFromStorage          = "Taken from storage",
+
     ui = {
         inventory_title           = "Inventaire",
         weight                    = "Poids",
@@ -454,6 +501,25 @@ Locales['fr'] = {
         ground                    = "Sol",
         max_weight                = "Poids max",
         no_drops_nearby           = "Aucun objet à proximité",
+
+        -- Weapon registry
+        weapon_registry           = "Registre des armes",
+        check_serial              = "Vérifier un numéro de série",
+        search                    = "Rechercher",
+        registered_to             = "Enregistrée au nom de",
+        registered_by             = "Enregistrée par",
+        serial_not_registered     = "Ce numéro de série n'est pas enregistré.",
+        nearby_players            = "Joueurs à proximité",
+        refresh                   = "Actualiser",
+        weapons                   = "armes",
+        no_weapons                = "Aucune arme sur ce joueur",
+        no_serial                 = "aucun",
+        unregistered              = "Non enregistrée",
+        register                  = "Enregistrer",
+        no_players_nearby         = "Aucun joueur à proximité",
+        close                     = "Fermer",
+        worn                      = "Porté",
+        copied                    = "Copié !",
     },
 }
 
@@ -535,6 +601,9 @@ Locales['es'] = {
         decay = "Deterioro ",
     },
 
+    movedToStorage            = "Moved to storage",
+    takenFromStorage          = "Taken from storage",
+
     ui = {
         inventory_title           = "Inventario",
         weight                    = "Peso",
@@ -592,6 +661,25 @@ Locales['es'] = {
         ground                    = "Suelo",
         max_weight                = "Peso máx",
         no_drops_nearby           = "Sin objetos cerca",
+
+        -- Weapon registry
+        weapon_registry           = "Registro de armas",
+        check_serial              = "Comprobar un número de serie",
+        search                    = "Buscar",
+        registered_to             = "Registrada a nombre de",
+        registered_by             = "Registrada por",
+        serial_not_registered     = "Ese número de serie no está registrado.",
+        nearby_players            = "Jugadores cercanos",
+        refresh                   = "Actualizar",
+        weapons                   = "armas",
+        no_weapons                = "Este jugador no tiene armas",
+        no_serial                 = "ninguno",
+        unregistered              = "No registrada",
+        register                  = "Registrar",
+        no_players_nearby         = "No hay jugadores cerca",
+        close                     = "Cerrar",
+        worn                      = "Puesto",
+        copied                    = "¡Copiado!",
     },
 }
 
@@ -673,6 +761,9 @@ Locales['it'] = {
         decay = "Deterioramento ",
     },
 
+    movedToStorage            = "Moved to storage",
+    takenFromStorage          = "Taken from storage",
+
     ui = {
         inventory_title           = "Inventario",
         weight                    = "Peso",
@@ -730,6 +821,25 @@ Locales['it'] = {
         ground                    = "Terra",
         max_weight                = "Peso max",
         no_drops_nearby           = "Nessun oggetto vicino",
+
+        -- Weapon registry
+        weapon_registry           = "Registro armi",
+        check_serial              = "Controlla un numero di serie",
+        search                    = "Cerca",
+        registered_to             = "Registrata a",
+        registered_by             = "Registrata da",
+        serial_not_registered     = "Quel numero di serie non è registrato.",
+        nearby_players            = "Giocatori vicini",
+        refresh                   = "Aggiorna",
+        weapons                   = "armi",
+        no_weapons                = "Nessuna arma su questo giocatore",
+        no_serial                 = "nessuno",
+        unregistered              = "Non registrata",
+        register                  = "Registra",
+        no_players_nearby         = "Nessun giocatore vicino",
+        close                     = "Chiudi",
+        worn                      = "Indossato",
+        copied                    = "Copiato!",
     },
 }
 
@@ -811,6 +921,9 @@ Locales['ar'] = {
         decay = "التدهور ",
     },
 
+    movedToStorage            = "Moved to storage",
+    takenFromStorage          = "Taken from storage",
+
     ui = {
         inventory_title           = "المخزون",
         weight                    = "الوزن",
@@ -868,6 +981,25 @@ Locales['ar'] = {
         ground                    = "الأرض",
         max_weight                = "الوزن الأقصى",
         no_drops_nearby           = "لا توجد أغراض ساقطة قريبة",
+
+        -- Weapon registry
+        weapon_registry           = "سجل الأسلحة",
+        check_serial              = "التحقق من رقم تسلسلي",
+        search                    = "بحث",
+        registered_to             = "مسجَّلة باسم",
+        registered_by             = "سجَّلها",
+        serial_not_registered     = "هذا الرقم التسلسلي غير مسجَّل.",
+        nearby_players            = "اللاعبون القريبون",
+        refresh                   = "تحديث",
+        weapons                   = "أسلحة",
+        no_weapons                = "لا أسلحة على هذا اللاعب",
+        no_serial                 = "لا يوجد",
+        unregistered              = "غير مسجَّلة",
+        register                  = "تسجيل",
+        no_players_nearby         = "لا يوجد لاعبون قريبون",
+        close                     = "إغلاق",
+        worn                      = "مُرتدى",
+        copied                    = "تم النسخ!",
     },
 }
 

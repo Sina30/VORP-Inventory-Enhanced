@@ -131,6 +131,12 @@ function Weapon:RemoveWeaponFromPed()
 		TriggerEvent("vorp_fishing:resetFishing")
 	end
 
+	local nameHash = joaat(self.name)
+	if nameHash == `WEAPON_LASSO` or nameHash == `WEAPON_LASSO_REINFORCED` then
+		SetCurrentPedWeapon(PlayerPedId(), `WEAPON_UNARMED`, true, 0, false, false)
+		return
+	end
+
 	local isWeaponAGun = Citizen.InvokeNative(0x705BE297EEBDB95D, joaat(self.name))
 	local isWeaponOneHanded = Citizen.InvokeNative(0xD955FEE4B87AFA07, joaat(self.name))
 	local move = false
@@ -179,28 +185,28 @@ function Weapon:equipwep()
 	local weaponGroup = GetWeapontypeGroup(weaponHash_0)
 	local isWeaponBow = weaponGroup == joaat("GROUP_BOW")
 	local isWeaponPetrolCan = weaponGroup == joaat("GROUP_PETROLCAN")
+	local isLasso = weaponHash_0 == joaat("WEAPON_LASSO") or weaponHash_0 == joaat("WEAPON_LASSO_REINFORCED")
 	local playerPedId = PlayerPedId()
 	local ammoCount = 0
-	-- is weapon assigned as no ammo needed then set to 1 so it can be used
 	if Config.nonAmmoThrowables[self.name] then
 		ammoCount = 1
 	end
 
-	-- Pull current ammo for weapons that need ammo while being given to the ped.
-	-- First try weapon's own ammo (loadout.ammo), fallback to player ammo cache
 	if isWeaponThrowable or isWeaponBow or isWeaponPetrolCan then
 		local ammotypes = SharedData.AmmoTypes and SharedData.AmmoTypes[weaponGroup]
 		if ammotypes then
 			for ammo_name, _ in pairs(ammotypes) do
-				local qty = nil
-				if isWeaponBow and PlayerAmmoInfo and PlayerAmmoInfo.ammo then
-					qty = PlayerAmmoInfo.ammo[ammo_name]
-				end
-				if not qty or qty == 0 then
+				local qty
+				if isWeaponBow then
+					-- bows draw from the shared player arrow pool ONLY. Never
+					-- restore from the weapon's stored ammo - that value is stale
+					-- and would re-grant arrows that were already shot (dupe).
+					qty = PlayerAmmoInfo and PlayerAmmoInfo.ammo and PlayerAmmoInfo.ammo[ammo_name]
+				else
 					qty = self.ammo and self.ammo[ammo_name]
-				end
-				if (not qty or qty == 0) and PlayerAmmoInfo and PlayerAmmoInfo.ammo then
-					qty = PlayerAmmoInfo.ammo[ammo_name]
+					if (not qty or qty == 0) and PlayerAmmoInfo and PlayerAmmoInfo.ammo then
+						qty = PlayerAmmoInfo.ammo[ammo_name]
+					end
 				end
 				if qty and qty > 0 then
 					ammoCount = qty
@@ -209,13 +215,15 @@ function Weapon:equipwep()
 			end
 		end
 	end
-	if isWeaponBow and ammoCount <= 0 then
+	-- the lasso has no real ammo; give it 1 so it can be used. a bow must NOT
+	-- get a fallback - an empty bow stays empty until arrows are recovered.
+	if isLasso and ammoCount <= 0 then
 		ammoCount = 1
 	end
 
-	if isWeaponMelee or isWeaponThrowable or isWeaponBow or isWeaponPetrolCan then
+	if isWeaponMelee or isWeaponThrowable or isWeaponBow or isWeaponPetrolCan or isLasso then
 		GiveDelayedWeaponToPed(playerPedId, weaponHash_0, ammoCount, true, 0)
-		if isWeaponBow then
+		if isWeaponBow or isLasso then
 			SetCurrentPedWeapon(playerPedId, weaponHash_0, false, 0, false, false)
 		end
 	else

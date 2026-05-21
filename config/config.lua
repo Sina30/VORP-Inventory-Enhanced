@@ -74,6 +74,9 @@ Config = {
 		},
 	},
 
+	-- stashType (optional): nil = normal stash, "cooler" or "refrigerator" =
+	-- preserving stash. Items inside a preserving stash decay slower (cooler)
+	-- or not at all (refrigerator). See Config.Preservation below.
 	Stashes = {
 		{
 			id = "stash_valentine_sheriff",
@@ -93,12 +96,116 @@ Config = {
 			shared = false,
 			allowedJobs = "all",
 		},
+		{
+			id = "cooler_valentine",
+			name = "Cooler",
+			coord = vector3(-310.86, 802.51, 118.93),
+			maxWeight = 30.0,
+			slots = 12,
+			shared = true,
+			allowedJobs = "all",
+			stashType = "cooler",        -- slows food decay
+		},
+		{
+			id = "refrigerator_valentine",
+			name = "Refrigerator",
+			coord = vector3(-281.30, 808.45, 119.38),
+			maxWeight = 70.0,
+			slots = 24,
+			shared = true,
+			allowedJobs = "all",
+			stashType = "refrigerator",  -- fully halts food decay
+		},
 	},
 
 	StashPrompt = {
 		Key = 0xCEFD9220,  -- E key
 		HoldDuration = 500, -- ms
 		DrawDistance = 2.0,
+	},
+
+	-- Modulates the decay speed of degradable items (anything with maxDegradation
+	-- in the items database). Works with the existing durability/freshness system.
+	Preservation = {
+		Enabled       = true,
+		TickMinutes   = 1,    -- how often decay is recalculated (minutes)
+
+		-- Decay multiplier while an item sits inside a stash of this stashType.
+		-- 0.0 = item never decays, 1.0 = normal decay.
+		StashDecayMultipliers = {
+			cooler       = 0.15,  -- coolers greatly slow decay
+			refrigerator = 0.0,   -- refrigerators fully halt decay
+		},
+
+		-- Weather / temperature. Cold weather preserves food better, heat rots it.
+		Weather = {
+			-- Set to false to disable and only use GlobalState / DefaultWeather.
+			SyncResource   = "weathersync",
+			DefaultWeather = "OVERCAST",
+			Multipliers = {
+				default        = 1.0,
+				SUNNY          = 1.35, -- hot: food rots faster
+				HIGHPRESSURE   = 1.35,
+				SANDSTORM      = 1.4,
+				CLEAR          = 1.2,
+				CLEARING       = 1.2,
+				OVERCAST       = 1.0,
+				CLOUDS         = 1.0,
+				MISTY          = 0.95,
+				MIST           = 0.95,
+				FOG            = 0.95,
+				RAIN           = 0.85,
+				DRIZZLE        = 0.85,
+				SHOWERS        = 0.85,
+				SHOWER         = 0.85,
+				THUNDER        = 0.85,
+				THUNDERSTORM   = 0.85,
+				HAIL           = 0.6,
+				SLEET          = 0.5,
+				SNOWLIGHT      = 0.5,
+				SNOW           = 0.4,  -- cold: food preserved well
+				BLIZZARD       = 0.3,
+				GROUNDBLIZZARD = 0.3,
+				WHITEOUT       = 0.3,
+			},
+		},
+
+		-- Cured / salted food keeps longer. Either list item names here or set
+		-- metadata.salted = true on the item when you create it.
+		SaltedMultiplier = 0.5,
+		SaltedItems = {
+			-- ["consumable_saltedmeat"] = true,
+		},
+
+		-- Raw / perishable food (meat, fish) spoils faster.
+		PerishableMultiplier = 1.6,
+		PerishableItems = {
+			-- ["consumable_meat"] = true,
+			-- ["consumable_rawfish"] = true,
+		},
+
+		-- Rotten food. When a degradable consumable is used at or below this
+		-- freshness %, vorp_inventory fires 'vorp_inventory:Server:OnRottenItemUse'
+		-- so your consumable scripts can apply extra hunger/thirst/sickness.
+		AllowEatingRotten = true, -- if true, expired/rotten food can still be eaten
+		RottenThreshold   = 35,   -- freshness % at or below which food counts as rotten
+	},
+
+	-- Lawmen open a registry UI at a station: they see weapons on nearby players
+	-- and can register them, and can look up any serial number by search.
+	-- Also available as commands: /registerweapon <playerId>  and  /checkserial <serial>
+	WeaponRegistry = {
+		Enabled         = true,
+		RegisterJobs    = { "police", "sheriff" }, -- jobs allowed to register / open the registry
+		CheckerJobsOnly = false,                   -- true = only RegisterJobs can /checkserial
+		NearbyRange     = 5.0,                     -- how close a player must be to show in the registry UI
+		PromptKey       = 0xCEFD9220,              -- E key — opens the registry UI at a station
+		PromptDistance  = 2.0,
+		-- Registry station locations. Lawmen press the prompt key here.
+		-- Adjust to a sheriff-office desk on your map.
+		Stations = {
+			vector3(-278.95, 803.86, 119.38),
+		},
 	},
 
 	DuelWield                      = true, -- If true duel wielding will be allowed.

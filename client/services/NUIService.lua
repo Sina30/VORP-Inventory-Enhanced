@@ -387,13 +387,16 @@ local function useWeapon(data)
 	local isWeaponBow = weaponGroup == joaat("GROUP_BOW")
 	local isWeaponAGun = Citizen.InvokeNative(0x705BE297EEBDB95D, weapName)
 	local isWeaponOneHanded = Citizen.InvokeNative(0xD955FEE4B87AFA07, weapName)
+	local isLasso = weapName == `WEAPON_LASSO` or weapName == `WEAPON_LASSO_REINFORCED`
 	local hasCurrentWeapon = weaponHash and weaponHash ~= 0 and weaponHash ~= `WEAPON_UNARMED`
 	local notdual = false
-	local canOneHandDualWield = isWeaponAGun and isWeaponOneHanded
+	-- Lasso is reported as a one-handed gun; exclude it from dual-wield so it
+	-- equips straight to hand instead of being holstered as an offhand weapon.
+	local canOneHandDualWield = isWeaponAGun and isWeaponOneHanded and not isLasso
 	local hasOtherDualWeapon = canOneHandDualWield and hasOtherUsedOneHandedWeapon(weaponId)
 	local hasWeapon = Citizen.InvokeNative(0x8DECB02F88F428BC, ped, weapName, 0, true)
 	local isWeaponThrowable = Citizen.InvokeNative(0x30E7C16B12DA8211, weapName)
-	local shouldEquipWeapon = (not UserWeapons[weaponId]:getUsed() and not hasWeapon) or isWeaponBow or isWeaponThrowable
+	local shouldEquipWeapon = (not UserWeapons[weaponId]:getUsed() and not hasWeapon) or isWeaponBow or isWeaponThrowable or isLasso
 	if canOneHandDualWield and hasCurrentWeapon and not Config.DuelWield then
 		return
 	elseif canOneHandDualWield and Config.DuelWield and not UserWeapons[weaponId]:getUsed() then
@@ -475,6 +478,21 @@ end
 
 exports("useItem", useItem) -- not tested yet
 
+function NUIService.SetWornClothing(worn)
+	SendNUIMessage({ action = "setWornClothing", worn = worn or {} })
+end
+
+exports("setWornClothing", NUIService.SetWornClothing)
+RegisterNetEvent("vorp_inventory:setWornClothing", NUIService.SetWornClothing)
+
+RegisterCommand("setworn", function(args)
+	local slot = args[1]
+	if slot then
+		local worn = {}
+		worn[slot] = true
+		NUIService.SetWornClothing(worn)
+	end
+end, false)
 
 function NUIService.NUISound()
 	if Config.SFX.ItemHover then

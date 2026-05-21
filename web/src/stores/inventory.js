@@ -5,22 +5,36 @@ import { postNUI } from '../utils/nui'
 function assignSlots(itemList) {
   var usedSlots = {}
   var result = []
-  // First pass: items with existing slots
+  var deferred = []
+
+  // Pass 1: locked/virtual items (money, gold, gunbelt) own their fixed slots.
   for (var i = 0; i < itemList.length; i++) {
-    if (itemList[i].slot != null) {
-      usedSlots[itemList[i].slot] = true
+    var it = itemList[i]
+    if (it.locked && it.slot != null && !usedSlots[it.slot]) {
+      usedSlots[it.slot] = true
+      result.push(Object.assign({}, it))
     }
   }
-  // Second pass: assign slots to items without one
-  var nextSlot = 1
+  // Pass 2: keep items whose slot is free; defer slot collisions and slotless items.
+  // This prevents two items sharing a slot, which would hide one in the slot map.
   for (var i = 0; i < itemList.length; i++) {
-    var item = Object.assign({}, itemList[i])
-    if (item.slot == null) {
-      while (usedSlots[nextSlot]) nextSlot++
-      item.slot = nextSlot
-      usedSlots[nextSlot] = true
+    var it = itemList[i]
+    if (it.locked && it.slot != null) continue
+    if (it.slot != null && !usedSlots[it.slot]) {
+      usedSlots[it.slot] = true
+      result.push(Object.assign({}, it))
+    } else {
+      deferred.push(it)
     }
-    result.push(item)
+  }
+  // Pass 3: assign the next free slot to every deferred item.
+  var nextSlot = 1
+  for (var i = 0; i < deferred.length; i++) {
+    while (usedSlots[nextSlot]) nextSlot++
+    var copy = Object.assign({}, deferred[i])
+    copy.slot = nextSlot
+    usedSlots[nextSlot] = true
+    result.push(copy)
   }
   return result
 }
@@ -111,6 +125,16 @@ export const useInventoryStore = defineStore('inventory', () => {
   const nearPlayersList = ref([])
   const pendingGiveData = ref(null)
   const showPlayerSelect = ref(false)
+
+  // Worn clothing: { hat: true, shirt: true, ... } keyed by clothing slot key.
+  // Fed by exports.vorp_inventory:setWornClothing(table) from a clothing resource.
+  const wornClothing = ref({})
+
+  // Weapon registry station UI
+  const registryOpen = ref(false)
+  const registryPlayers = ref([])
+  const registrySearchResult = ref(undefined) // undefined = no search, false = not found, object = found
+  const registrySearchedSerial = ref('')
 
 
   function setItems(newItems) {
@@ -307,6 +331,30 @@ export const useInventoryStore = defineStore('inventory', () => {
 
       case 'toggleHotbar':
         showHotbar.value = !showHotbar.value
+        break
+
+      case 'setWornClothing':
+        wornClothing.value = data.worn || {}
+        break
+
+      case 'openWeaponRegistry':
+        registryPlayers.value = data.players || []
+        registrySearchResult.value = undefined
+        registrySearchedSerial.value = ''
+        registryOpen.value = true
+        break
+
+      case 'weaponRegistryData':
+        registryPlayers.value = data.players || []
+        break
+
+      case 'weaponRegistrySearchResult':
+        registrySearchedSerial.value = data.serial || ''
+        registrySearchResult.value = data.result || false
+        break
+
+      case 'closeWeaponRegistry':
+        registryOpen.value = false
         break
     }
   }
@@ -631,6 +679,11 @@ export const useInventoryStore = defineStore('inventory', () => {
     nearPlayersList,
     pendingGiveData,
     showPlayerSelect,
+    wornClothing,
+    registryOpen,
+    registryPlayers,
+    registrySearchResult,
+    registrySearchedSerial,
     setItems,
     setPlayerInventory,
     setSecondInventory,

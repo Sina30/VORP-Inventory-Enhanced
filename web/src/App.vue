@@ -524,6 +524,10 @@
 
   function onKeyDown(e) {
     if (e.key === 'Escape' || e.key === 'F1') {
+      if (inventory.registryOpen) {
+        registryClose()
+        return
+      }
       if (inventory.isVisible) {
         inventory.hide()
         searchQuery.value = ''
@@ -532,6 +536,32 @@
         searchBlinkOn.value = true
       }
     }
+  }
+
+  // Weapon registry station
+  const registrySearchInput = ref('')
+  function registryRegister(weaponId, serverId) {
+    postNUI('RegistryRegister', { weaponId: weaponId, targetServerId: serverId }).catch(function(){})
+  }
+  function registryRefresh() {
+    postNUI('RegistryRefresh', {}).catch(function(){})
+  }
+  function registrySearch() {
+    var s = (registrySearchInput.value || '').trim()
+    if (!s) return
+    postNUI('RegistrySearch', { serial: s }).catch(function(){})
+  }
+  function registryClose() {
+    inventory.registryOpen = false
+    postNUI('RegistryClose', {}).catch(function(){})
+  }
+  // collapsible player cards
+  const registryExpanded = ref({})
+  function toggleRegistryPlayer(serverId) {
+    registryExpanded.value[serverId] = !registryExpanded.value[serverId]
+  }
+  function isRegistryExpanded(serverId) {
+    return !!registryExpanded.value[serverId]
   }
 
   onMounted(() => {
@@ -649,6 +679,29 @@
 
   function onClothingClick(slot) {
     postNUI('ChangeClothing', JSON.stringify(slot.param))
+  }
+
+  function isClothingWorn(slot) {
+    return !!(inventory.wornClothing && inventory.wornClothing[slot.key])
+  }
+
+  // Serial number copy bar (context menu)
+  const copiedSerial = ref(false)
+  function copySerial(serial) {
+    if (!serial) return
+    try {
+      var ta = document.createElement('textarea')
+      ta.value = String(serial)
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.focus()
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      copiedSerial.value = true
+      setTimeout(function() { copiedSerial.value = false }, 1500)
+    } catch (e) {}
   }
 </script>
 
@@ -951,11 +1004,13 @@
                           <img v-if="slot.lineSide === 'left'" src="./assets/clothing-line.png" class="pointer-events-none" style="height: 4px;">
                           <div
                             @click="onClothingClick(slot)"
-                            class="w-[2.5vw] h-[2.5vw] shrink-0 bg-[url(./assets/clothing-menu-background.png)] flex justify-center items-center transition-all hover:opacity-70 cursor-pointer"
+                            class="w-[2.5vw] h-[2.5vw] shrink-0 relative bg-[url(./assets/clothing-menu-background.png)] flex justify-center items-center transition-all hover:opacity-70 cursor-pointer"
                             style="background-size: 100% 100%;"
-                            :title="uiText(slot.key, slot.label)"
+                            :style="isClothingWorn(slot) ? { boxShadow: '0 0 0 2px #2fd06c, 0 0 6px rgba(47,208,108,0.6)' } : {}"
+                            :title="uiText(slot.key, slot.label) + (isClothingWorn(slot) ? ' - ' + uiText('worn', 'Worn') : '')"
                           >
-                            <img :src="getAsset(slot.icon)" >
+                            <img :src="getAsset(slot.icon)" :style="{ opacity: isClothingWorn(slot) ? 1 : 0.5 }">
+                            <span v-if="isClothingWorn(slot)" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#2fd06c] flex items-center justify-center text-[8px] text-black font-bold leading-none">&#10003;</span>
                           </div>
                           <img v-if="slot.lineSide === 'right'" src="./assets/clothing-line.png" class="pointer-events-none" style="height: 4px;">
                         </div>
@@ -1065,7 +1120,11 @@
                     <div class="w-full h-px bg-black/20"></div>
                     <div v-if="contextMenu.item.serial_number" class="w-full flex justify-between items-center">
                       <p>{{ uiText('serial_number', 'Serial Number') }}</p>
-                      <p class="text-[#565353]">{{ contextMenu.item.serial_number }}</p>
+                      <p @click="copySerial(contextMenu.item.serial_number)"
+                         class="text-[#565353] cursor-pointer hover:text-[#BEB592] transition-all select-none"
+                         :title="uiText('copyserial', 'Click to copy serial number')">
+                        {{ copiedSerial ? uiText('copied', 'Copied!') : contextMenu.item.serial_number }}
+                      </p>
                     </div>
                     <div v-if="contextMenu.item.maxDegradation > 0" class="w-full flex justify-between items-center">
                       <p>{{ uiText('durability', 'Durability') }}</p>
@@ -1164,6 +1223,85 @@
             </div>
           </Transition>
       </div>
+      </Transition>
+
+      <!-- Weapon Registry Station -->
+      <Transition name="fade">
+        <div v-if="inventory.registryOpen" class="fixed inset-0 z-[60] flex items-center justify-center" @click.self="registryClose">
+          <div class="w-[42vw] h-[80vh] bg-[url(./assets/context-background.png)] p-5 rounded flex flex-col gap-3 overflow-hidden" style="background-size: 100% 100%;" @click.stop>
+            <!-- header -->
+            <div class="w-full flex justify-between items-center">
+              <p class="text-xl">{{ uiText('weapon_registry', 'Weapon Registry') }}</p>
+              <div @click="registryClose" class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center cursor-pointer hover:opacity-70">
+                <img src="./assets/close-icon.png">
+              </div>
+            </div>
+            <div class="w-full h-px bg-black/20"></div>
+
+            <!-- Serial search -->
+            <div class="w-full flex flex-col gap-1">
+              <p class="text-sm font-semibold text-[#2b2118]">{{ uiText('check_serial', 'Check a Serial Number') }}</p>
+              <div class="w-full flex gap-2">
+                <input v-model="registrySearchInput" @keyup.enter="registrySearch" type="text" :placeholder="uiText('serial_number', 'Serial Number')" class="flex-1 h-[2.2vw] px-2 text-[#000000] bg-[url(./assets/search-background.png)]" style="background-size: 100% 100%;">
+                <div @click="registrySearch" class="h-[2.2vw] px-4 flex justify-center items-center cursor-pointer transition-all hover:opacity-70 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+                  <p class="text-sm text-[#BEB592]">{{ uiText('search', 'Search') }}</p>
+                </div>
+              </div>
+              <div v-if="inventory.registrySearchResult !== undefined" class="w-full p-2 bg-[url(./assets/settings-item-background.png)] text-xs" style="background-size: 100% 100%;">
+                <template v-if="inventory.registrySearchResult">
+                  <p class="text-black">{{ uiText('serial_number', 'Serial') }}: {{ inventory.registrySearchResult.serial }}</p>
+                  <p class="text-black">{{ inventory.registrySearchResult.weapon_name }}</p>
+                  <p class="text-[#2a6e3f] font-semibold">{{ uiText('registered_to', 'Registered to') }}: {{ inventory.registrySearchResult.owner_name }}</p>
+                  <p class="text-[#565353]">{{ uiText('registered_by', 'Registered by') }}: {{ inventory.registrySearchResult.registered_by }}</p>
+                </template>
+                <p v-else class="text-[#935b5b]">{{ uiText('serial_not_registered', 'That serial number is not registered.') }}</p>
+              </div>
+            </div>
+            <div class="w-full h-px bg-black/20"></div>
+
+            <!-- Nearby players -->
+            <div class="w-full flex justify-between items-center">
+              <p class="text-sm font-semibold text-[#2b2118]">{{ uiText('nearby_players', 'Nearby Players') }}</p>
+              <div @click="registryRefresh" class="px-3 h-[1.9vw] flex items-center cursor-pointer transition-all hover:opacity-70 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+                <p class="text-xs text-[#BEB592]">{{ uiText('refresh', 'Refresh') }}</p>
+              </div>
+            </div>
+            <div class="w-full flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
+              <template v-if="inventory.registryPlayers.length > 0">
+                <div v-for="p in inventory.registryPlayers" :key="p.serverId" class="w-full flex flex-col gap-1 p-2 bg-black/[0.05] rounded">
+                  <div @click="toggleRegistryPlayer(p.serverId)" class="w-full flex justify-between items-center cursor-pointer hover:opacity-70">
+                    <p class="text-sm font-semibold text-[#2b2118]">{{ p.name }} <span class="text-[#5a534a] font-normal">(ID {{ p.serverId }})</span></p>
+                    <p class="text-xs text-[#5a534a] flex items-center gap-2">
+                      <span>{{ (p.weapons ? p.weapons.length : 0) }} {{ uiText('weapons', 'weapons') }}</span>
+                      <span class="text-sm font-bold text-[#2b2118] w-3 text-center">{{ isRegistryExpanded(p.serverId) ? '-' : '+' }}</span>
+                    </p>
+                  </div>
+                  <template v-if="isRegistryExpanded(p.serverId)">
+                    <template v-if="p.weapons && p.weapons.length > 0">
+                      <div v-for="w in p.weapons" :key="w.id" class="w-full flex justify-between items-center p-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <div class="flex flex-col">
+                          <p class="text-xs text-black">{{ w.label }}</p>
+                          <p class="text-[10px] text-[#565353]">{{ uiText('serial_number', 'Serial') }}: {{ w.serial || uiText('no_serial', 'none') }}</p>
+                          <p v-if="w.registeredTo" class="text-[10px] text-[#2a6e3f] font-semibold">{{ uiText('registered_to', 'Registered to') }}: {{ w.registeredTo }}</p>
+                          <p v-else class="text-[10px] text-[#935b5b]">{{ uiText('unregistered', 'Unregistered') }}</p>
+                        </div>
+                        <div v-if="w.serial" @click="registryRegister(w.id, p.serverId)" class="px-3 h-[2vw] flex items-center cursor-pointer transition-all hover:opacity-70 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+                          <p class="text-xs text-[#BEB592]">{{ uiText('register', 'Register') }}</p>
+                        </div>
+                      </div>
+                    </template>
+                    <p v-else class="text-[10px] text-[#565353] pl-1">{{ uiText('no_weapons', 'No weapons on this player') }}</p>
+                  </template>
+                </div>
+              </template>
+              <p v-else class="text-xs text-[#565353] text-center p-4">{{ uiText('no_players_nearby', 'No players nearby') }}</p>
+            </div>
+
+            <div @click="registryClose" class="w-full h-[2.2vw] flex justify-center items-center cursor-pointer transition-all hover:opacity-70 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+              <p class="text-sm text-[#BEB592]">{{ uiText('close', 'Close') }}</p>
+            </div>
+          </div>
+        </div>
       </Transition>
 
       <Transition name="fade">

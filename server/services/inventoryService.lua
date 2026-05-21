@@ -569,10 +569,15 @@ function InventoryService.UseItem(data)
 		}
 	}
 
-	-- if its an item that can degrade then check if its expired
+	-- if its an item that can degrade then check if its expired / rotten
+	local presvCfg = Config.Preservation
+	local isRotten = false
 	if arguments.item.isDegradable then
 		local isExpired = item:isItemExpired()
-		if isExpired then
+		local rottenThreshold = (presvCfg and presvCfg.RottenThreshold) or 0
+		isRotten = isExpired or ((item:getPercentage() or 100) <= rottenThreshold)
+		local allowRotten = presvCfg and presvCfg.Enabled and presvCfg.AllowEatingRotten
+		if isExpired and not allowRotten then
 			local canUseExpired = arguments.item.metadata?.useExpired or ServerItems[itemName]?.useExpired
 			if not canUseExpired then
 				local text = "Item is expired and can't be used"
@@ -586,7 +591,15 @@ function InventoryService.UseItem(data)
 		end
 	end
 
+	-- expose rot state so consumable scripts can react
+	arguments.item.isRotten = isRotten
+	arguments.item.freshness = arguments.item.percentage
+
 	TriggerEvent("vorp_inventory:Server:OnItemUse", arguments)
+	if isRotten then
+		-- consumable scripts listen for this to apply extra hunger/thirst/sickness
+		TriggerEvent("vorp_inventory:Server:OnRottenItemUse", arguments, _source)
+	end
 
 	local success <const>, result <const> = pcall(UsableItemsFunctions[itemName], arguments)
 	if not success then
@@ -1347,10 +1360,8 @@ local function shareData(data)
 
 	data.uid = uid
 	data.droppedBy = source
-	-- Keep old broadcast for backwards compat
-	TriggerClientEvent("vorpInventory:sharePickupClient", -1, data, 1)
-	-- Sync drop locations
 	InventoryService.syncDropLocations()
+	TriggerClientEvent("vorpInventory:sharePickupClient", -1, data, 1)
 
 	if not Config.DeletePickups.Enable then
 		return
