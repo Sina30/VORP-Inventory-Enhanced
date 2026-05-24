@@ -247,6 +247,32 @@ RegisterServerEvent("vorp_inventory:Server:CloseCustomInventory", function()
     INVENTORY_IN_USE[_source] = nil
 end)
 
+-- Compute repair item requirements that apply to a given weapon name.
+-- Returns an array of { item, amount } that the player must hold (and that will be consumed).
+local function getRepairRequirementsFor(weaponName)
+    local out = {}
+    local rules = Config.WeaponDurability and Config.WeaponDurability.RepairItems
+    if not rules or #rules == 0 then return out end
+    for _, rule in ipairs(rules) do
+        local applies = rule.applies
+        local matches = false
+        if applies == nil or applies == "all" then
+            matches = true
+        elseif type(applies) == "table" then
+            for _, prefix in ipairs(applies) do
+                if type(prefix) == "string" and prefix ~= "" and weaponName:sub(1, #prefix) == prefix then
+                    matches = true
+                    break
+                end
+            end
+        end
+        if matches and rule.item and (rule.amount or 0) > 0 then
+            out[#out+1] = { item = rule.item, amount = math.floor(tonumber(rule.amount)) }
+        end
+    end
+    return out
+end
+
 RegisterServerEvent("vorpinventory:repairWeapon", function(weaponId, repairTime)
     local _source = source
     local user = Core.getUser(_source)
@@ -260,6 +286,23 @@ RegisterServerEvent("vorpinventory:repairWeapon", function(weaponId, repairTime)
     local weapon = UsersWeapons.default[weaponId]
     if not weapon or weapon:getPropietary() ~= identifier then return end
     if RepairingWeapons[_source] then return end -- already repairing
+
+    -- Require + consume repair items before accepting the job. All-or-nothing: if any
+    -- requirement is missing, the repair is aborted before the weapon is hidden.
+    local requirements = getRepairRequirementsFor(weapon:getName())
+    if #requirements > 0 then
+        for _, req in ipairs(requirements) do
+            local invItem = exports.vorp_inventory:getItem(_source, req.item)
+            if not invItem or (invItem.count or 0) < req.amount then
+                Core.NotifyRightTip(_source, T("repairMissingItem", req.amount, req.item), 4000)
+                TriggerClientEvent("vorpInventory:repairCompleted", _source)
+                return
+            end
+        end
+        for _, req in ipairs(requirements) do
+            exports.vorp_inventory:subItem(_source, req.item, req.amount, {})
+        end
+    end
 
     local savedSlot = weapon:getSlot()
 

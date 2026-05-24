@@ -222,7 +222,15 @@ function Weapon:equipwep()
 	end
 
 	if isWeaponMelee or isWeaponThrowable or isWeaponBow or isWeaponPetrolCan or isLasso then
-		GiveDelayedWeaponToPed(playerPedId, weaponHash_0, ammoCount, true, 0)
+		-- HasPedGotWeapon: re-giving a weapon whose ammo lives in a shared player pool
+		-- (bow → AMMO_ARROW, throwables, petrol can) makes the engine ADD ammoCount
+		-- to the existing pool instead of setting it. That would double the arrows
+		-- on re-equip and cap at the weapon's max — exactly the "ammo refills to 40
+		-- after rejoin/re-equip" bug. Only give the weapon if the ped doesn't have it.
+		local pedHasWeapon = Citizen.InvokeNative(0x8DECB02F88F428BC, playerPedId, weaponHash_0, 0, true)
+		if not pedHasWeapon then
+			GiveDelayedWeaponToPed(playerPedId, weaponHash_0, ammoCount, true, 0)
+		end
 		if isWeaponBow or isLasso then
 			SetCurrentPedWeapon(playerPedId, weaponHash_0, false, 0, false, false)
 		end

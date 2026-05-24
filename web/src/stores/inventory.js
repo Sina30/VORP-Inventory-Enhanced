@@ -105,6 +105,12 @@ export const useInventoryStore = defineStore('inventory', () => {
   const secondCapacity = ref(0)
   const secondWeight = ref(null)
 
+  // Shop system
+  const shopState = ref(null)        // full payload from server: { id, name, role, items, balance, ... }
+  const shopId = ref(null)
+  const shopView = ref('shopping')   // 'shopping' | 'owner'
+  const shopOwnerTab = ref('stock')  // 'stock' | 'prices' | 'employees' | 'hours' | 'balance'
+
   // HUD data
   const money = ref(0)
   const gold = ref(0)
@@ -158,6 +164,12 @@ export const useInventoryStore = defineStore('inventory', () => {
   }
 
   function hide() {
+    if (invType.value === 'shop') {
+      postNUI('ShopClose', { shopId: shopId.value })
+      shopState.value = null
+      shopId.value = null
+      shopView.value = 'shopping'
+    }
     isVisible.value = false
     invType.value = 'main'
     postNUI('NUIFocusOff', {})
@@ -186,9 +198,17 @@ export const useInventoryStore = defineStore('inventory', () => {
         if (data.type === 'store') { StoreId.value = data.StoreId; geninfo.value = data.geninfo }
         if (data.type === 'steal') { stealid.value = data.stealId; secondWeight.value = data.weight || null }
         if (data.type === 'Container') Containerid.value = data.Containerid
+        if (data.type === 'shop') {
+          shopId.value = data.id
+          shopView.value = 'shopping'
+        }
 
         if (data.type === 'main') {
           secondInventoryType.value = 'drop'
+        } else if (data.type === 'shop') {
+          secondTitle.value = data.title || ''
+          secondCapacity.value = data.capacity || 0
+          secondInventoryType.value = 'shop'
         } else {
           secondTitle.value = data.title || ''
           secondCapacity.value = data.capacity || 0
@@ -196,6 +216,19 @@ export const useInventoryStore = defineStore('inventory', () => {
         }
 
         isVisible.value = true
+        break
+
+      case 'setShopState':
+        shopState.value = data.shop || null
+        if (data.shop) {
+          shopId.value = data.shop.id
+          if (data.shop.name) secondTitle.value = data.shop.name
+          if (data.shop.capacity) secondCapacity.value = data.shop.capacity
+          // If the player loses owner role mid-session, snap back to shopping view.
+          if (shopView.value === 'owner' && data.shop.role === 'customer') {
+            shopView.value = 'shopping'
+          }
+        }
         break
 
       case 'hide':
@@ -702,5 +735,9 @@ export const useInventoryStore = defineStore('inventory', () => {
     swapSecondSlots,
     swapStealSlots,
     swapDropSlots,
+    shopState,
+    shopId,
+    shopView,
+    shopOwnerTab,
   }
 })

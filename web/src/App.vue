@@ -2,7 +2,7 @@
   import { useInventoryStore } from './stores/inventory'
   import { useSettingsStore } from './stores/settings'
   import { postNUI, securePostNUI } from './utils/nui'
-  import { ref, onMounted, onUnmounted, watch } from 'vue'
+  import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
   const inventory = useInventoryStore()
   const settings = useSettingsStore()
 
@@ -31,6 +31,17 @@
   function uiText(key, fallback) {
     var ui = inventory.LANGUAGE && inventory.LANGUAGE.ui ? inventory.LANGUAGE.ui : {}
     return ui[key] || fallback
+  }
+
+  // Replace successive %s tokens in `template` with the rest of the arguments.
+  // Used to insert numbers/labels into translated strings (server-side Lua uses
+  // string.format with %s for the same purpose).
+  function formatTemplate(template, ...args) {
+    var i = 0
+    return String(template).replace(/%s/g, function() {
+      var v = args[i++]
+      return v == null ? '' : String(v)
+    })
   }
 
   function slotCount(item) {
@@ -369,6 +380,50 @@
     dragGhost.value.show = false
   }
 
+  // ============== Context-menu Use/Give (no drag state required) ==============
+  // Both helpers mirror the drag-button logic but operate directly on a passed item
+  // (used by Use/Give buttons inside the right-click context menu).
+  function isContextMenuActionsEnabled() {
+    return !!(inventory.LuaConfig && inventory.LuaConfig.ContextMenuActions && inventory.LuaConfig.ContextMenuActions.Enabled)
+  }
+  const hideRightColumnActions = computed(function() {
+    var cfg = inventory.LuaConfig && inventory.LuaConfig.ContextMenuActions
+    return !!(cfg && cfg.Enabled && cfg.HideRightColumnButtons)
+  })
+  function canUseItem(item) {
+    if (!item) return false
+    if (item.type === 'item_money' || item.type === 'item_gold') return false
+    return true
+  }
+  function canGiveItem(item) {
+    if (!item) return false
+    if (isEquippedWeapon(item)) return false
+    if (item.locked && item.type !== 'item_money' && item.type !== 'item_gold') return false
+    return true
+  }
+  function onContextUse(item) {
+    if (!canUseItem(item)) return
+    if (item.type === 'item_weapon' && (item.used || item.used2)) {
+      postNUI('UnequipWeapon', { item: item.name, id: item.id })
+    } else {
+      var useAmt = getTransferAmount(item) || 1
+      postNUI('UseItem', { item: item.name, type: item.type, hash: item.hash, amount: useAmt, id: item.id })
+    }
+    playPopSound()
+    contextMenu.value.show = false
+  }
+  function onContextGive(item) {
+    if (!canGiveItem(item)) return
+    var amount = getTransferAmount(item) || 1
+    var giveType = item.type
+    var giveItem = item.name
+    if (item.type === 'item_money') giveItem = 'money'
+    if (item.type === 'item_gold') giveItem = 'gold'
+    postNUI('GetNearPlayers', { type: giveType, what: 'give', item: giveItem, count: amount, id: item.id, hash: item.hash || 1 }).catch(function(){})
+    playPopSound()
+    contextMenu.value.show = false
+  }
+
   function onDropGive() {
     if (dragFrom.value === null) return
     if (dragSource.value !== 'player') { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
@@ -642,6 +697,13 @@
       var item = inventory.getItemAtSlot(dragFrom.value)
       if (item) {
         if (isEquippedWeapon(item)) { dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return }
+        // Shop: player → shop slot = sell to shop. Slot doesn't matter — the server matches by item name.
+        if (inventory.invType === 'shop') {
+          var amt = getTransferAmount(item)
+          postNUI('ShopSell', { shopId: inventory.shopId, item: item.name, qty: amt || 1 })
+          playPopSound()
+          dragFrom.value = null; dragSource.value = null; dragGhost.value.show = false; return
+        }
         var targetSecItem = inventory.getSecondItemAtSlot(toSlot)
         // Steal: swap when different items
         if (inventory.invType === 'steal' && targetSecItem && !canStackItems(item, targetSecItem)) {
@@ -683,6 +745,94 @@
 
   function isClothingWorn(slot) {
     return !!(inventory.wornClothing && inventory.wornClothing[slot.key])
+  }
+
+  // ============================= SHOP =============================
+  const shopQtyInput  = ref({}) // [itemName] = qty for restock/withdraw
+  const shopPriceBuy  = ref({})
+  const shopPriceSell = ref({})
+  const empCharId     = ref(null)
+  const empPerms      = ref({ restock: true, prices: true, withdraw: false, hours: false })
+  const hoursOpen     = ref(null)
+  const hoursClose    = ref(null)
+  const hoursEnforce  = ref(true)
+  const withdrawAmount = ref(null)
+
+  function shopItemAt(slot) {
+    var items = inventory.shopState && inventory.shopState.items || []
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].slot === slot) return items[i]
+    }
+    return null
+  }
+
+  function onShopSlotClick(slot, e) {
+    var item = shopItemAt(slot); if (!item) return
+    if (!inventory.shopId) return
+    // Shift-click → buy 5, Ctrl-click → buy 10, otherwise 1.
+    var qty = 1
+    if (e && e.shiftKey) qty = 5
+    if (e && (e.ctrlKey || e.metaKey)) qty = 10
+    if (item.buy_price > 0) {
+      postNUI('ShopBuy', { shopId: inventory.shopId, item: item.name, qty: qty })
+      playPopSound()
+    }
+  }
+
+  function onPurchaseShop() {
+    if (!inventory.shopId) return
+    postNUI('ShopPurchase', { shopId: inventory.shopId })
+  }
+
+  function onRestock(it) {
+    var q = (shopQtyInput.value[it.name] && shopQtyInput.value[it.name] > 0) ? shopQtyInput.value[it.name] : 1
+    postNUI('ShopRestock', { shopId: inventory.shopId, item: it.name, qty: q })
+  }
+
+  function onWithdrawStock(it) {
+    var q = (shopQtyInput.value[it.name] && shopQtyInput.value[it.name] > 0) ? shopQtyInput.value[it.name] : 1
+    postNUI('ShopWithdrawStock', { shopId: inventory.shopId, item: it.name, qty: q })
+  }
+
+  function onSetPrice(it) {
+    var b = shopPriceBuy.value[it.name];  if (b == null || b === '') b = it.buy_price
+    var s = shopPriceSell.value[it.name]; if (s == null || s === '') s = it.sell_price
+    postNUI('ShopSetPrice', { shopId: inventory.shopId, item: it.name, buyPrice: Number(b), sellPrice: Number(s) })
+  }
+
+  function onSaveEmployee() {
+    if (!empCharId.value) return
+    var p = 0
+    if (empPerms.value.restock)  p |= 1
+    if (empPerms.value.prices)   p |= 2
+    if (empPerms.value.withdraw) p |= 4
+    if (empPerms.value.hours)    p |= 8
+    postNUI('ShopSetEmployee', { shopId: inventory.shopId, charid: empCharId.value, perms: p })
+    empCharId.value = null
+  }
+
+  function onSaveHours() {
+    var o = hoursOpen.value  != null ? hoursOpen.value  : (inventory.shopState && inventory.shopState.openHour)
+    var c = hoursClose.value != null ? hoursClose.value : (inventory.shopState && inventory.shopState.closeHour)
+    postNUI('ShopSetHours', { shopId: inventory.shopId, openHour: Number(o), closeHour: Number(c), enforce: !!hoursEnforce.value })
+  }
+
+  function onToggleForceClosed() {
+    var newState = !(inventory.shopState && inventory.shopState.forceClosed)
+    postNUI('ShopSetForceClosed', { shopId: inventory.shopId, force: newState })
+  }
+
+  function onWithdrawBalance() {
+    var amt = Number(withdrawAmount.value)
+    if (!amt || amt <= 0) return
+    postNUI('ShopWithdrawBalance', { shopId: inventory.shopId, amount: amt })
+    withdrawAmount.value = null
+  }
+
+  function onWithdrawBalanceAll() {
+    var amt = inventory.shopState && inventory.shopState.balance
+    if (!amt || amt <= 0) return
+    postNUI('ShopWithdrawBalance', { shopId: inventory.shopId, amount: amt })
   }
 
   // Serial number copy bar (context menu)
@@ -788,10 +938,10 @@
               <div class="w-[9vw] h-[5vh]  flex justify-center items-center transition-all hover:opacity-70 bg-[url(./assets/amount-background.png)]" style="background-size: 100% 100%;">
                   <input type="number" v-model.number="transferAmount" min="0.01" step="any" @keydown="$event.key === '-' || $event.key === 'e' ? $event.preventDefault() : null" class="w-full h-full text-center text-xl text-[#BEB592]" placeholder="1">
               </div>
-              <div @mouseup="onDropUse" class="w-[9vw] h-[5vh] mt-2 flex justify-center text-xl text-[#BEB592] items-center transition-all cursor-pointer bg-[url(./assets/buttons-background.png)]" :style="{ opacity: dragFrom !== null && dragSource === 'player' ? 1 : 0.4, backgroundSize: '100% 100%' }">
+              <div v-if="!hideRightColumnActions" @mouseup="onDropUse" class="w-[9vw] h-[5vh] mt-2 flex justify-center text-xl text-[#BEB592] items-center transition-all cursor-pointer bg-[url(./assets/buttons-background.png)]" :style="{ opacity: dragFrom !== null && dragSource === 'player' ? 1 : 0.4, backgroundSize: '100% 100%' }">
                   {{ uiText('use', 'Use') }}
               </div>
-              <div @mouseup="onDropGive" class="w-[9vw] h-[5vh] flex justify-center text-xl text-[#BEB592] items-center transition-all cursor-pointer bg-[url(./assets/buttons-background.png)]" :style="{ opacity: dragFrom !== null && dragSource === 'player' ? 1 : 0.4, backgroundSize: '100% 100%' }">
+              <div v-if="!hideRightColumnActions" @mouseup="onDropGive" class="w-[9vw] h-[5vh] flex justify-center text-xl text-[#BEB592] items-center transition-all cursor-pointer bg-[url(./assets/buttons-background.png)]" :style="{ opacity: dragFrom !== null && dragSource === 'player' ? 1 : 0.4, backgroundSize: '100% 100%' }">
                   {{ uiText('give', 'Give') }}
               </div>
               <!-- settings panel -->
@@ -887,6 +1037,255 @@
                         </template>
                     </div>
                 </div>
+              </div>
+
+              <!-- Second Inventory: shop -->
+              <div v-else-if="inventory.secondInventoryType === 'shop'" key="shop" class="w-full h-full flex flex-col items-center gap-2">
+
+                <!-- ============ HEADER ============ -->
+                <div class="p-2 flex justify-between items-center h-[9%] w-full bg-[url(./assets/header-background.png)]" style="background-size: 100% 100%;">
+                  <div class="flex flex-col leading-tight">
+                    <p class="text-xl">{{ inventory.shopState?.name || inventory.secondTitle }}</p>
+                    <p v-if="inventory.shopState" class="text-[10px] text-[#4D4B4B] flex items-center gap-2">
+                      <span v-if="inventory.shopState.role === 'owner'">{{ uiText('shop_role_owner', 'Owner') }}</span>
+                      <span v-else-if="inventory.shopState.role === 'employee'">{{ uiText('shop_role_employee', 'Employee') }}</span>
+                      <span v-else>{{ uiText('shop_role_customer', 'Customer') }}</span>
+                      <span v-if="!inventory.shopState.isOpen" class="px-1.5 py-px tracking-wider text-[#8a2b2b] font-semibold" style="background: rgba(0,0,0,0.12);">{{ uiText('shop_closed_chip', 'CLOSED') }}</span>
+                    </p>
+                  </div>
+                  <div class="w-[2vw] h-[2vw] flex justify-center items-center rounded-md bg-black/10">
+                    <img src="./assets/cash-icon.png">
+                  </div>
+                </div>
+
+                <!-- ============ VIEW SWITCHER (owner/employee only) ============ -->
+                <div v-if="inventory.shopState && (inventory.shopState.role === 'owner' || inventory.shopState.role === 'employee')" class="w-full h-[5vh] grid grid-cols-2 gap-1.5">
+                  <div @click="inventory.shopView = 'shopping'"
+                       class="flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/bottom-menu-background.png)]"
+                       :style="{ backgroundSize: '100% 100%', opacity: inventory.shopView !== 'owner' ? 1 : 0.45 }">
+                    <p class="text-xs">{{ uiText('shop_shop_view', 'Shop View') }}</p>
+                  </div>
+                  <div @click="inventory.shopView = 'owner'"
+                       class="flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/bottom-menu-background.png)]"
+                       :style="{ backgroundSize: '100% 100%', opacity: inventory.shopView === 'owner' ? 1 : 0.45 }">
+                    <p class="text-xs">{{ uiText('shop_manage', 'Manage') }}</p>
+                  </div>
+                </div>
+
+                <!-- ============ SHOPPING VIEW ============ -->
+                <!-- Owner view is only available to owner/employee; everyone else lands here regardless of shopView. -->
+                <template v-if="inventory.shopView !== 'owner' || !inventory.shopState || (inventory.shopState.role !== 'owner' && inventory.shopState.role !== 'employee')">
+
+                  <!-- For-sale strip -->
+                  <div v-if="inventory.shopState?.purchasable" class="w-full h-[6vh] flex justify-between items-center px-3 py-1 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center shrink-0">
+                        <img src="./assets/cash-icon.png">
+                      </div>
+                      <p class="text-xs truncate">{{ uiText('shop_for_sale_strip', 'This shop is for sale') }}</p>
+                    </div>
+                    <div @click="onPurchaseShop" class="h-[2vw] px-3 flex justify-center items-center text-xs text-[#BEB592] cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+                      {{ formatTemplate(uiText('shop_buy_for', 'Buy for $%s'), inventory.shopState.purchasePrice) }}
+                    </div>
+                  </div>
+
+                  <!-- Balance line (owner/employee on the shopping view) -->
+                  <div v-if="inventory.shopState?.role !== 'customer' && inventory.shopState?.features?.ShopBalance" class="w-full h-[5vh] flex justify-between items-center px-3 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                    <div class="flex items-center gap-2">
+                      <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center">
+                        <img src="./assets/cash-icon.png">
+                      </div>
+                      <p class="text-xs">{{ uiText('shop_balance', 'Balance') }}</p>
+                    </div>
+                    <p class="text-sm font-semibold">${{ inventory.shopState?.balance ?? 0 }}</p>
+                  </div>
+
+                  <!-- divider above slot grid -->
+                  <div class="w-full h-1 bg-[url(./assets/line.png)]" style="background-size: 100% 100%;"></div>
+
+                  <!-- 5xN shop slot grid (mirrors secondary inventory grid exactly) -->
+                  <div class="w-full flex-1 grid grid-cols-5 gap-1.5 content-start overflow-y-auto">
+                    <div v-for="i in (inventory.shopState?.capacity || 35)" :key="'shop-slot-'+i"
+                         @click="onShopSlotClick(i, $event)"
+                         class="aspect-square bg-white/[0.08] rounded transition-all hover:opacity-70 p-1 relative flex flex-col items-center justify-center cursor-pointer">
+                      <template v-if="shopItemAt(i)">
+                        <span class="absolute top-0.5 right-1 text-[10px] text-white/70">{{ shopItemAt(i).infinite ? '∞' : shopItemAt(i).count }}</span>
+                        <div class="absolute top-0.5 left-1 flex flex-col items-start leading-none">
+                          <span class="text-[10px] text-[#e6c074] font-semibold">${{ shopItemAt(i).buy_price }}</span>
+                          <span v-if="shopItemAt(i).sell_price > 0 && inventory.shopState?.buyback" class="text-[8px] text-[#b8d49f] mt-px">▾${{ shopItemAt(i).sell_price }}</span>
+                        </div>
+                        <img :src="getItemImage(shopItemAt(i).name)" @error="onImgError" class="absolute inset-0 m-auto max-w-[40%] max-h-[60%] object-contain">
+                        <p class="absolute bottom-0.5 left-0 right-0 text-center text-[10px] text-white/70 truncate px-0.5">{{ shopItemAt(i).label }}</p>
+                      </template>
+                      <template v-else>
+                        <span class="absolute top-0.5 right-1 text-[10px] text-white/40">{{ i }}</span>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- ============ OWNER MANAGE VIEW ============ -->
+                <template v-else>
+
+                  <!-- 5-tab strip -->
+                  <div class="w-full h-[4vh] grid grid-cols-5 gap-1">
+                    <div v-for="tab in ['stock','prices','employees','hours','balance']" :key="tab"
+                         @click="inventory.shopOwnerTab = tab"
+                         class="flex justify-center items-center cursor-pointer transition-all hover:opacity-90 bg-[url(./assets/bottom-menu-background.png)]"
+                         :style="{ backgroundSize: '100% 100%', opacity: inventory.shopOwnerTab === tab ? 1 : 0.4 }">
+                      <p class="text-[11px]">{{ uiText('shop_tab_' + tab, tab) }}</p>
+                    </div>
+                  </div>
+
+                  <!-- divider -->
+                  <div class="w-full h-1 bg-[url(./assets/line.png)]" style="background-size: 100% 100%;"></div>
+
+                  <!-- panel body -->
+                  <div class="w-full flex-1 overflow-y-auto flex flex-col gap-1.5 pr-1">
+
+                    <!-- STOCK -->
+                    <template v-if="inventory.shopOwnerTab === 'stock'">
+                      <div v-for="it in (inventory.shopState?.items || [])" :key="'stk-'+it.name" class="w-full h-[5.5vh] flex justify-between items-center px-2 gap-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                          <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center shrink-0">
+                            <img :src="getItemImage(it.name)" @error="onImgError" class="max-w-[80%] max-h-[80%] object-contain">
+                          </div>
+                          <div class="flex flex-col leading-tight min-w-0">
+                            <p class="text-[12px] truncate">{{ it.label }}</p>
+                            <p class="text-[10px] text-[#4D4B4B]">{{ formatTemplate(uiText('shop_stock_qty', 'qty %s'), it.infinite ? '∞' : it.count) }}</p>
+                          </div>
+                        </div>
+                        <div class="h-[1.75vw] flex items-center gap-1 shrink-0">
+                          <div class="w-[3vw] h-full bg-[url(./assets/ms-input-background.png)]" style="background-size: 100% 100%;">
+                            <input v-model.number="shopQtyInput[it.name]" type="number" min="1" placeholder="1" class="w-full h-full text-center text-[11px] text-[#BEB592]">
+                          </div>
+                          <div @click="onRestock(it)" :class="['w-[1.75vw] h-full flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]', inventory.shopState?.type === 'npc' ? 'opacity-30 pointer-events-none' : '']" style="background-size: 100% 100%;">
+                            <p class="text-sm text-[#BEB592] leading-none">+</p>
+                          </div>
+                          <div @click="onWithdrawStock(it)" :class="['w-[1.75vw] h-full flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]', (inventory.shopState?.type === 'npc' || it.count <= 0) ? 'opacity-30 pointer-events-none' : '']" style="background-size: 100% 100%;">
+                            <p class="text-sm text-[#BEB592] leading-none">−</p>
+                          </div>
+                        </div>
+                      </div>
+                      <p v-if="inventory.shopState?.type === 'npc'" class="text-[10px] text-[#4D4B4B] text-center mt-1">{{ uiText('shop_npc_note_restock', "NPC shops have infinite stock and can't be restocked.") }}</p>
+                    </template>
+
+                    <!-- PRICES -->
+                    <template v-else-if="inventory.shopOwnerTab === 'prices'">
+                      <div v-for="it in (inventory.shopState?.items || [])" :key="'pri-'+it.name" class="w-full h-[5.5vh] flex justify-between items-center px-2 gap-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                          <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center shrink-0">
+                            <img :src="getItemImage(it.name)" @error="onImgError" class="max-w-[80%] max-h-[80%] object-contain">
+                          </div>
+                          <p class="text-[12px] truncate">{{ it.label }}</p>
+                        </div>
+                        <div class="h-[1.75vw] flex items-center gap-1 shrink-0">
+                          <p class="text-[10px] text-[#4D4B4B]">{{ uiText('shop_buy_label', 'buy') }}</p>
+                          <div class="w-[3vw] h-full bg-[url(./assets/ms-input-background.png)]" style="background-size: 100% 100%;">
+                            <input v-model.number="shopPriceBuy[it.name]" type="number" min="0" :placeholder="it.buy_price" class="w-full h-full text-center text-[11px] text-[#BEB592]">
+                          </div>
+                          <p class="text-[10px] text-[#4D4B4B]">{{ uiText('shop_sell_label', 'sell') }}</p>
+                          <div class="w-[3vw] h-full bg-[url(./assets/ms-input-background.png)]" style="background-size: 100% 100%;">
+                            <input v-model.number="shopPriceSell[it.name]" type="number" min="0" :placeholder="it.sell_price" class="w-full h-full text-center text-[11px] text-[#BEB592]">
+                          </div>
+                          <div @click="onSetPrice(it)" :class="['h-full px-2 flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]', inventory.shopState?.type === 'npc' ? 'opacity-30 pointer-events-none' : '']" style="background-size: 100% 100%;">
+                            <p class="text-[10px] text-[#BEB592]">{{ uiText('shop_save', 'save') }}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <p v-if="inventory.shopState?.type === 'npc'" class="text-[10px] text-[#4D4B4B] text-center mt-1">{{ uiText('shop_npc_note_prices', 'NPC shop prices are set in config/shops.lua.') }}</p>
+                    </template>
+
+                    <!-- EMPLOYEES -->
+                    <template v-else-if="inventory.shopOwnerTab === 'employees'">
+                      <!-- charid input -->
+                      <div class="w-full h-[5.5vh] flex justify-between items-center px-2 gap-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <div class="w-[1.75vw] h-[1.75vw] rounded-md bg-black/10 flex justify-center items-center">
+                            <img src="./assets/user-icon.png">
+                          </div>
+                          <p class="text-[12px]">{{ uiText('shop_add_employee', 'Add / update employee') }}</p>
+                        </div>
+                        <div class="w-[5vw] h-[1.75vw] bg-[url(./assets/ms-input-background.png)]" style="background-size: 100% 100%;">
+                          <input v-model.number="empCharId" type="number" :placeholder="uiText('shop_charid_placeholder', 'charid')" class="w-full h-full text-center text-[11px] text-[#BEB592]">
+                        </div>
+                      </div>
+                      <!-- perm toggles -->
+                      <div v-for="perm in [ {k:'restock',label:'shop_perm_restock',fallback:'restock'}, {k:'prices',label:'shop_perm_prices',fallback:'prices'}, {k:'withdraw',label:'shop_perm_withdraw',fallback:'withdraw'}, {k:'hours',label:'shop_perm_hours',fallback:'hours'} ]" :key="'perm-'+perm.k" class="w-full h-[5vh] flex justify-between items-center px-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <p class="text-[12px]">{{ uiText(perm.label, perm.fallback) }}</p>
+                        <div @click="empPerms[perm.k] = !empPerms[perm.k]" class="w-[1.75vw] h-[1.75vw] bg-[url(./assets/toggle-background.png)] cursor-pointer hover:opacity-80 flex justify-center items-center" style="background-size: 100% 100%;">
+                          <Transition name="scale"><img v-if="empPerms[perm.k]" src="./assets/toggled-icon.png"></Transition>
+                        </div>
+                      </div>
+                      <!-- save button -->
+                      <div @click="onSaveEmployee" class="w-full h-[5vh] flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+                        <p class="text-sm text-[#BEB592]">{{ uiText('shop_save', 'save') }}</p>
+                      </div>
+                      <p class="text-[10px] text-[#4D4B4B] text-center">{{ uiText('shop_emp_hint', 'Set all permissions off to remove an employee.') }}</p>
+                    </template>
+
+                    <!-- HOURS -->
+                    <template v-else-if="inventory.shopOwnerTab === 'hours'">
+                      <div class="w-full h-[5vh] flex justify-between items-center px-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <p class="text-[12px]">{{ uiText('shop_open_at', 'Open at') }}</p>
+                        <div class="w-[4vw] h-[1.75vw] bg-[url(./assets/ms-input-background.png)]" style="background-size: 100% 100%;">
+                          <input v-model.number="hoursOpen" type="number" min="0" max="23" :placeholder="inventory.shopState?.openHour" class="w-full h-full text-center text-[11px] text-[#BEB592]">
+                        </div>
+                      </div>
+                      <div class="w-full h-[5vh] flex justify-between items-center px-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <p class="text-[12px]">{{ uiText('shop_close_at', 'Close at') }}</p>
+                        <div class="w-[4vw] h-[1.75vw] bg-[url(./assets/ms-input-background.png)]" style="background-size: 100% 100%;">
+                          <input v-model.number="hoursClose" type="number" min="0" max="23" :placeholder="inventory.shopState?.closeHour" class="w-full h-full text-center text-[11px] text-[#BEB592]">
+                        </div>
+                      </div>
+                      <div class="w-full h-[5vh] flex justify-between items-center px-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <p class="text-[12px]">{{ uiText('shop_enforce_hours', 'Enforce opening hours') }}</p>
+                        <div @click="hoursEnforce = !hoursEnforce" class="w-[1.75vw] h-[1.75vw] bg-[url(./assets/toggle-background.png)] cursor-pointer hover:opacity-80 flex justify-center items-center" style="background-size: 100% 100%;">
+                          <Transition name="scale"><img v-if="hoursEnforce" src="./assets/toggled-icon.png"></Transition>
+                        </div>
+                      </div>
+                      <div @click="onSaveHours" class="w-full h-[5vh] flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+                        <p class="text-sm text-[#BEB592]">{{ uiText('shop_save', 'save') }}</p>
+                      </div>
+                      <div class="w-full h-1 bg-[url(./assets/line.png)] my-1" style="background-size: 100% 100%;"></div>
+                      <div class="w-full h-[5vh] flex justify-between items-center px-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <p class="text-[12px]">{{ uiText('shop_force_close', 'Force-close shop') }}</p>
+                        <div @click="onToggleForceClosed" class="w-[1.75vw] h-[1.75vw] bg-[url(./assets/toggle-background.png)] cursor-pointer hover:opacity-80 flex justify-center items-center" style="background-size: 100% 100%;">
+                          <Transition name="scale"><img v-if="inventory.shopState?.forceClosed" src="./assets/toggled-icon.png"></Transition>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- BALANCE / WITHDRAW -->
+                    <template v-else-if="inventory.shopOwnerTab === 'balance'">
+                      <div class="w-full h-[8vh] flex justify-between items-center px-3 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <div class="flex items-center gap-2">
+                          <div class="w-[2vw] h-[2vw] rounded-md bg-black/10 flex justify-center items-center">
+                            <img src="./assets/cash-icon.png">
+                          </div>
+                          <p class="text-[12px]">{{ uiText('shop_current_balance', 'Current balance') }}</p>
+                        </div>
+                        <p class="text-2xl font-semibold">${{ inventory.shopState?.balance ?? 0 }}</p>
+                      </div>
+                      <div class="w-full h-[5.5vh] flex justify-between items-center px-2 gap-2 bg-[url(./assets/settings-item-background.png)]" style="background-size: 100% 100%;">
+                        <p class="text-[12px]">{{ uiText('shop_amount_placeholder', 'amount') }}</p>
+                        <div class="h-[1.75vw] flex items-center gap-1">
+                          <div class="w-[5vw] h-full bg-[url(./assets/ms-input-background.png)]" style="background-size: 100% 100%;">
+                            <input v-model.number="withdrawAmount" type="number" min="1" class="w-full h-full text-center text-[11px] text-[#BEB592]">
+                          </div>
+                        </div>
+                      </div>
+                      <div class="w-full grid grid-cols-2 gap-1.5">
+                        <div @click="onWithdrawBalance" class="h-[5vh] flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+                          <p class="text-sm text-[#BEB592]">{{ uiText('shop_withdraw', 'withdraw') }}</p>
+                        </div>
+                        <div @click="onWithdrawBalanceAll" class="h-[5vh] flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]" style="background-size: 100% 100%;">
+                          <p class="text-sm text-[#BEB592]">{{ uiText('shop_withdraw_all', 'all') }}</p>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
               </div>
 
               <!-- Second Inventory: craft -->
@@ -1161,6 +1560,21 @@
                   <div v-for="(c, ci) in getWeaponComponents(contextMenu.item)" :key="ci" class="w-full flex justify-between items-center">
                     <p class="text-xs text-[#4E4D4D]">{{ c.type || c.comp }}</p>
                     <p class="text-xs text-[#565353]">{{ c.label }}</p>
+                  </div>
+                </div>
+                <!-- Action buttons (Use / Give) — only shown when ContextMenuActions.Enabled -->
+                <div v-if="isContextMenuActionsEnabled()" class="mt-4 w-full flex gap-2">
+                  <div v-if="canUseItem(contextMenu.item)"
+                       @click="onContextUse(contextMenu.item)"
+                       class="flex-1 h-[4vh] flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]"
+                       style="background-size: 100% 100%;">
+                    <p class="text-sm text-[#BEB592]">{{ uiText('use', 'Use') }}</p>
+                  </div>
+                  <div v-if="canGiveItem(contextMenu.item)"
+                       @click="onContextGive(contextMenu.item)"
+                       class="flex-1 h-[4vh] flex justify-center items-center cursor-pointer transition-all hover:opacity-80 bg-[url(./assets/buttons-background.png)]"
+                       style="background-size: 100% 100%;">
+                    <p class="text-sm text-[#BEB592]">{{ uiText('give', 'Give') }}</p>
                   </div>
                 </div>
             </div>

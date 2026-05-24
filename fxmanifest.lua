@@ -15,6 +15,7 @@ shared_scripts {
   "config/weapons.lua",
   "config/ammo.lua",
   "config/craft.lua",
+  "config/shops.lua",
   "locales/locale.lua",
   "shared/models/*.lua",
   'shared/handler/*.lua',

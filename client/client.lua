@@ -82,7 +82,12 @@ end
 RegisterCommand("vorp_toggle_hotbar", function() toggleHotbar() end, false)
 
 -- Suppress native weapon-slot controls and run hotbar quick-use keys.
+-- Skipped entirely when Config.WeaponWheel.Enabled = true so the native wheel works.
 CreateThread(function()
+    if Config.WeaponWheel and Config.WeaponWheel.Enabled then
+        print("^3[vorp_inventory]^7 Native weapon wheel enabled — hotbar quick-use shortcuts disabled.")
+        return
+    end
     repeat Wait(2000) until LocalPlayer.state.IsInSession
     print("^2[vorp_inventory]^7 Hotbar controls active.")
     local tabControl = 0xB238FE0B

@@ -1,4 +1,4 @@
-Lang = "en"  -- en, tr, fr, it, es, ar
+Lang = "en"  -- en, tr, fr, it, es, ar, pl
 
 Config = {
 
@@ -212,6 +212,49 @@ Config = {
 
 	StealRequiresWeapon            = true, -- If true, player must have a weapon equipped to steal
 
+	-- ============================ CONTEXT MENU ACTIONS ==========================
+	-- The right-click context menu can show Use/Give action buttons alongside the
+	-- existing item-info panel. When enabled, you can optionally hide the larger
+	-- Use/Give buttons in the right-side column so all interactions go through
+	-- the context menu.
+	ContextMenuActions = {
+		Enabled              = false, -- show Use/Give inside the right-click context menu
+		HideRightColumnButtons = false, -- also hide the existing Use/Give buttons next to the inventory
+	},
+
+	-- ============================ WEAPON WHEEL ==================================
+	-- By default the inventory suppresses the native RDR3 weapon wheel (TAB) and the
+	-- 1-5 weapon-slot keys so they can be repurposed for the hotbar quick-use shortcuts.
+	-- Flip Enabled = true to keep the native wheel working — note that this disables
+	-- the hotbar quick-use shortcuts because they share the same keys.
+	WeaponWheel = {
+		Enabled = false,
+	},
+
+	-- ============================ HOLSTERING ====================================
+	-- Visual weapon attachment: when a player has a weapon equipped (selected) but
+	-- not currently in hand, spawn a prop of that weapon and attach it to the body
+	-- so it's visible on the hip / back. Pure cosmetic — does not affect mechanics.
+	WeaponHolstering = {
+		Enabled = false,                  -- master switch
+		PollInterval = 500,               -- ms between checks
+		-- Bone + offset per weapon category (categories from Config.WeaponCategories).
+		-- BoneHash from PedBones (try IDs from RDR3 ped skeletons). Offsets are
+		-- relative (forward / right / up); rotations in degrees.
+		Bones = {
+			Sidearm = { bone = 23553, offsetX = 0.10, offsetY = -0.07, offsetZ = -0.03, rotX = 0.0,   rotY = 0.0,   rotZ = 0.0 },   -- right hip
+			Long    = { bone = 24818, offsetX = -0.08, offsetY = -0.18, offsetZ = 0.16, rotX = 0.0,   rotY = 180.0, rotZ = 0.0 },   -- back / spine
+			Melee   = { bone = 23553, offsetX = 0.05, offsetY = -0.20, offsetZ = -0.05, rotX = -90.0, rotY = 0.0,   rotZ = 0.0 },   -- left hip
+			Bow     = { bone = 24818, offsetX = -0.10, offsetY = -0.20, offsetZ = 0.20, rotX = 0.0,   rotY = 180.0, rotZ = 0.0 },
+			-- Throwable/Lasso/Other not attached by default — add entries to enable.
+		},
+		-- Override per-weapon prop models if the default joaat("w_"..name) doesn't load.
+		-- Most weapons have a corresponding `w_<weaponname>` model that works.
+		ModelOverrides = {
+			-- WEAPON_REVOLVER_CATTLEMAN = "w_pistol_cattleman",
+		},
+	},
+
 	WeaponDurability = {
 		Enabled = true,
 		DurabilityLossPerShot = 0.5,    -- durability loss per bullet fired (percentage)
@@ -219,6 +262,22 @@ Config = {
 		MaxRepairTime = 60000,          -- ms, max repair time when durability is 0 (60s)
 		RepairLocations = {
 			{ coord = vector3(-279.49, 783.75, 119.5) },  -- Valentine
+		},
+
+		-- Items the player must have in inventory to repair a weapon. Consumed on repair.
+		-- Each entry: { item = "<db item name>", amount = <int>, applies = <list|"all"|nil> }
+		--   `applies` can be:
+		--     "all" or nil  → required for every weapon
+		--     { "WEAPON_REVOLVER_", "WEAPON_PISTOL_" } → required only for weapons whose
+		--                     name starts with any of these prefixes. Use the full hash
+		--                     name for an exact match (e.g. "WEAPON_BOW").
+		-- Multiple entries can apply to the same weapon — all of them are required.
+		-- Leave the list empty {} to keep the legacy behavior (no items required).
+		RepairItems = {
+			-- { item = "gun_oil",   amount = 1, applies = { "WEAPON_REVOLVER_", "WEAPON_PISTOL_", "WEAPON_RIFLE_", "WEAPON_REPEATER_", "WEAPON_SHOTGUN_", "WEAPON_SNIPERRIFLE_" } },
+			-- { item = "gun_cloth", amount = 1, applies = "all" },
+			-- { item = "whetstone", amount = 1, applies = { "WEAPON_MELEE_", "WEAPON_THROWN_" } },
+			-- { item = "bowstring", amount = 1, applies = { "WEAPON_BOW" } },
 		},
 	},
 
@@ -276,12 +335,31 @@ Config = {
 
 	-- HOW MANY WEAPONS ALLOWED PER PLAYER FOR ITEMS IS IN VORP CORE CONFIG
 	MaxItemsInInventory            = {
+		-- Either a single number (total cap, legacy behavior):
+		--   Weapons = 6,
+		-- Or a table for per-category caps + optional total:
+		--   Weapons = { Sidearm = 2, Long = 2, Melee = 2, Throwable = 2, Bow = 1, Other = 2, Total = 6 },
+		-- Categories are defined by WeaponCategories below.
+		-- -1 = unlimited, 0 = blocked entirely.
 		Weapons = 6,
 	},
 
 	-- HERE YOU CAN SET THE MAX AMOUNT OF WEAPONS PER JOB (IF YOU WANT)
+	-- Same shape as MaxItemsInInventory.Weapons — either a number (total cap) or a table.
 	JobsAllowed                    = {
 		police = 10 -- Job name and max weapons allowed dont allow less than the above
+	},
+
+	-- Maps weapon-name prefixes (or full hash names) to a category. Used by
+	-- per-category limits above and by the repair-item filter (config.WeaponDurability.RepairItems).
+	-- Weapons whose name doesn't match any prefix fall into "Other".
+	WeaponCategories               = {
+		Sidearm   = { "WEAPON_REVOLVER_", "WEAPON_PISTOL_" },
+		Long      = { "WEAPON_RIFLE_", "WEAPON_REPEATER_", "WEAPON_SHOTGUN_", "WEAPON_SNIPERRIFLE_" },
+		Melee     = { "WEAPON_MELEE_" },
+		Throwable = { "WEAPON_THROWN_" },
+		Bow       = { "WEAPON_BOW" },
+		Lasso     = { "WEAPON_LASSO" },
 	},
 
 	-- FIRST JOIN

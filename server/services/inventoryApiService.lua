@@ -1279,7 +1279,6 @@ function InventoryAPI.canCarryAmountWeapons(player, amount, cb, weaponName)
 	local charId = sourceCharacter.charIdentifier
 	local invCapacity = sourceCharacter.invCapacity
 	local job = sourceCharacter.job
-	local DefaultAmount = Config.MaxItemsInInventory.Weapons
 
 	if weaponName and isInventoryFull(identifier, charId, invCapacity) then
 		return respond(cb, false)
@@ -1289,18 +1288,8 @@ function InventoryAPI.canCarryAmountWeapons(player, amount, cb, weaponName)
 		return respond(cb, true)
 	end
 
-	if Config.JobsAllowed[job] then
-		DefaultAmount = Config.JobsAllowed[job]
-	end
-
-	if DefaultAmount ~= -1 then
-		local sourceInventoryWeaponCount = InventoryAPI.getUserTotalCountWeapons(identifier, charId) + amount
-		if sourceInventoryWeaponCount > DefaultAmount then
-			return respond(cb, false)
-		end
-	end
-
-	return respond(cb, true)
+	local ok = InventoryAPI.checkWeaponLimitForPickup(identifier, charId, weaponName, job, amount)
+	return respond(cb, ok)
 end
 
 exports("canCarryWeapons", InventoryAPI.canCarryAmountWeapons)
@@ -1562,7 +1551,6 @@ function InventoryAPI.giveWeapon(player, weaponId, target, cb)
 	local job = sourceCharacter.job
 	local _target = target
 	local userWeapons = UsersWeapons.default
-	local DefaultAmount = Config.MaxItemsInInventory.Weapons
 	local weapon = userWeapons[weaponId]
 
 	if not weapon then
@@ -1571,31 +1559,21 @@ function InventoryAPI.giveWeapon(player, weaponId, target, cb)
 
 	local weaponName = weapon:getName()
 	local weight = weapon:getWeight()
-	local notListed = false
+	local notListed = weaponName and Config.notweapons[weaponName:upper()] ~= nil
 
-	if Config.JobsAllowed[job] then
-		DefaultAmount = Config.JobsAllowed[job]
-	end
+	if not notListed then
+		local itemsToTalWeight = InventoryAPI.getUserTotalCountItems(sourceIdentifier, sourceCharId)
+		local sourceTotalWeaponWeight = InventoryAPI.getUserTotalCountWeapons(sourceIdentifier, sourceCharId, true)
 
-	if DefaultAmount ~= 0 then
-		if weaponName and Config.notweapons[weaponName:upper()] then
-			notListed = true
+		if (weight + itemsToTalWeight + sourceTotalWeaponWeight) > invCapacity then
+			Core.NotifyRightTip(_source, "inventory full", 2000)
+			return respond(cb, false)
 		end
 
-		if not notListed then
-			local itemsToTalWeight = InventoryAPI.getUserTotalCountItems(sourceIdentifier, sourceCharId)
-			local sourceTotalWeaponWeight = InventoryAPI.getUserTotalCountWeapons(sourceIdentifier, sourceCharId, true)
-
-			if (weight + itemsToTalWeight + sourceTotalWeaponWeight) > invCapacity then
-				Core.NotifyRightTip(_source, "inventory full", 2000)
-				return respond(cb, false)
-			end
-
-			local sourceTotalWeaponCount = InventoryAPI.getUserTotalCountWeapons(sourceIdentifier, sourceCharId) + 1
-			if sourceTotalWeaponCount > DefaultAmount then
-				Core.NotifyRightTip(_source, T("cantweapons"), 2000)
-				return respond(cb, false)
-			end
+		local ok, msg = InventoryAPI.checkWeaponLimitForPickup(sourceIdentifier, sourceCharId, weaponName, job, 1)
+		if not ok then
+			Core.NotifyRightTip(_source, msg or T("cantweapons"), 2000)
+			return respond(cb, false)
 		end
 	end
 
@@ -1687,6 +1665,84 @@ function InventoryAPI.getUserTotalCountWeapons(identifier, charId, checkWeight)
 		end
 	end
 	return userTotalWeaponCount
+end
+
+--- Resolve a weapon name to a category from Config.WeaponCategories. Falls back to "Other".
+local function categorizeWeapon(weaponName)
+	if not weaponName or not Config.WeaponCategories then return "Other" end
+	for category, prefixes in pairs(Config.WeaponCategories) do
+		if type(prefixes) == "table" then
+			for _, prefix in ipairs(prefixes) do
+				if type(prefix) == "string" and prefix ~= "" and weaponName:sub(1, #prefix) == prefix then
+					return category
+				end
+			end
+		end
+	end
+	return "Other"
+end
+InventoryAPI.categorizeWeapon = categorizeWeapon
+
+--- Per-category counts of a player's loadout (ignores items in Config.notweapons).
+---@return table<string, integer>
+function InventoryAPI.getUserWeaponCountByCategory(identifier, charId)
+	local counts = {}
+	for _, weapon in pairs(UsersWeapons.default) do
+		if weapon:getPropietary() == identifier and weapon:getCharId() == charId then
+			local name = weapon:getName()
+			if name and not Config.notweapons[name:upper()] then
+				local cat = categorizeWeapon(name)
+				counts[cat] = (counts[cat] or 0) + 1
+			end
+		end
+	end
+	return counts
+end
+
+--- Check whether the player is allowed to pick up `weaponName` based on
+--- Config.MaxItemsInInventory.Weapons (or the job override in Config.JobsAllowed[job]).
+--- Supports both legacy `Weapons = 6` (total cap) and the new table form
+--- `Weapons = { Sidearm=2, Long=2, ..., Total=6 }`.
+--- Returns ok, plus a notify message + the relevant cap/current for callers that want to
+--- surface a category-specific reason.
+function InventoryAPI.checkWeaponLimitForPickup(identifier, charId, weaponName, job, addAmount)
+	addAmount = tonumber(addAmount) or 1
+	local rule = Config.MaxItemsInInventory and Config.MaxItemsInInventory.Weapons
+	if job and Config.JobsAllowed and Config.JobsAllowed[job] ~= nil then
+		rule = Config.JobsAllowed[job]
+	end
+	if rule == nil then return true end
+	if weaponName and Config.notweapons[weaponName:upper()] then return true end
+
+	-- Legacy single-number form
+	if type(rule) == "number" then
+		if rule == -1 then return true end
+		if rule == 0 then return false, T("cantweapons") end
+		local total = InventoryAPI.getUserTotalCountWeapons(identifier, charId) + addAmount
+		if total > rule then return false, T("cantweapons") end
+		return true
+	end
+
+	-- Table form: per-category caps with optional Total
+	if type(rule) == "table" then
+		local counts = InventoryAPI.getUserWeaponCountByCategory(identifier, charId)
+		if rule.Total and rule.Total ~= -1 then
+			local total = 0
+			for _, n in pairs(counts) do total = total + n end
+			if (total + addAmount) > rule.Total then return false, T("cantweapons") end
+		end
+		local cat = categorizeWeapon(weaponName)
+		local catCap = rule[cat]
+		if catCap and catCap ~= -1 then
+			local current = counts[cat] or 0
+			if (current + addAmount) > catCap then
+				return false, T("cantweaponsCategory", cat, catCap)
+			end
+		end
+		return true
+	end
+
+	return true
 end
 
 --- Register custom inventory

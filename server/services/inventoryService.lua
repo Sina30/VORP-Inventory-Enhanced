@@ -1212,33 +1212,28 @@ function InventoryService.onPickup(data)
 		-- weapons
 		local notListed = false
 		local totalInvWeight = 0
-		local sourceInventoryWeaponCount = 0
-		local DefaultAmount = Config.MaxItemsInInventory.Weapons
 		local weaponId = ItemPickUps[uid].weaponid
 		local userWeapons = UsersWeapons.default
 		local weapon = userWeapons[weaponId]
 		if weapon then
 			local serialNumber = weapon:getSerialNumber()
 			local weaponCustomDesc = weapon:getCustomDesc()
-
-			if Config.JobsAllowed[job] then
-				DefaultAmount = Config.JobsAllowed[job]
+			local weaponName = weapon:getName()
+			if weaponName and Config.notweapons[weaponName:upper()] then
+				notListed = true
 			end
 
-			if DefaultAmount ~= 0 then
-				local weaponName = weapon:getName()
-				if weaponName and Config.notweapons[weaponName:upper()] then
-					notListed = true
-				end
+			local canCarry = notListed
+			if not notListed then
+				local itemsToTalWeight = InventoryAPI.getUserTotalCountItems(identifier, charId)
+				local sourceInventoryWeaponWeight = InventoryAPI.getUserTotalCountWeapons(identifier, charId, true)
+				totalInvWeight = (itemsToTalWeight + weapon:getWeight() + sourceInventoryWeaponWeight)
+				local underWeight = totalInvWeight <= invCapacity
+				local underCount = InventoryAPI.checkWeaponLimitForPickup(identifier, charId, weaponName, job, 1)
+				canCarry = underWeight and underCount
+			end
 
-				if not notListed then
-					local itemsToTalWeight = InventoryAPI.getUserTotalCountItems(identifier, charId)
-					local sourceInventoryWeaponWeight = InventoryAPI.getUserTotalCountWeapons(identifier, charId, true)
-					totalInvWeight = (itemsToTalWeight + weapon:getWeight() + sourceInventoryWeaponWeight)
-					sourceInventoryWeaponCount = InventoryAPI.getUserTotalCountWeapons(identifier, charId) + 1
-				end
-
-				if totalInvWeight <= invCapacity or sourceInventoryWeaponCount <= DefaultAmount then
+			if canCarry then
 					local weaponObj = ItemPickUps[uid].obj
 
 					weapon:setDropped(0)
@@ -1260,7 +1255,6 @@ function InventoryService.onPickup(data)
 					TriggerClientEvent("vorpInventory:playerAnim", _source, uid)
 					InventoryService.addWeapon(_source, weaponId)
 					SvUtils.SendDiscordWebhook(info)
-				end
 			else
 				Core.NotifyRightTip(_source, T("fullInventoryWeapon"), 2000)
 			end
@@ -1613,34 +1607,23 @@ function InventoryService.giveWeapon2(player, weaponId, target)
 	local job = sourceCharacter.job
 	local _target = target
 	local userWeapons = UsersWeapons.default
-	local DefaultAmount = Config.MaxItemsInInventory.Weapons
 	local weaponName = userWeapons[weaponId]:getName()
 	local serialNumber = userWeapons[weaponId]:getSerialNumber()
 	local desc = userWeapons[weaponId]:getCustomDesc()
 	local newWeight = userWeapons[weaponId]:getWeight()
 	local charname, _, steamname = getSourceInfo(_source)
 	local charname2, _, steamname2 = getSourceInfo(_target)
-	local notListed = false
+	local notListed = weaponName and Config.notweapons[weaponName:upper()] ~= nil
 
 	if not desc then
 		desc = userWeapons[weaponId]:getDesc()
 	end
 
-	if Config.JobsAllowed[job] then
-		DefaultAmount = Config.JobsAllowed[job]
-	end
-
-	if DefaultAmount ~= 0 then
-		if weaponName and Config.notweapons[weaponName:upper()] then
-			notListed = true
-		end
-
-		if not notListed then
-			local sourceTotalWeaponCount = InventoryAPI.getUserTotalCountWeapons(sourceIdentifier, sourceCharId) + 1
-			if sourceTotalWeaponCount > DefaultAmount then
-				Core.NotifyRightTip(_source, T("cantweapons"), 2000)
-				return
-			end
+	if not notListed then
+		local ok, msg = InventoryAPI.checkWeaponLimitForPickup(sourceIdentifier, sourceCharId, weaponName, job, 1)
+		if not ok then
+			Core.NotifyRightTip(_source, msg or T("cantweapons"), 2000)
+			return
 		end
 	end
 
