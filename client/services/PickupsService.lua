@@ -438,12 +438,10 @@ CreateThread(function()
 end)
 
 
--- for debug
 AddEventHandler("onResourceStop", function(resourceName)
 	if GetCurrentResourceName() ~= resourceName then return end
 	deleteAllDropLocationProps()
 	if not Config.DevMode then return end
-	--delete all entities
 	for key, value in pairs(WorldPickups) do
 		if DoesEntityExist(value.entityId) then
 			DeleteEntity(value.entityId)

@@ -72,6 +72,16 @@ Locales['en'] = {
     noPermissionTake          = "You don't have permissions to take from this storage",
     MaxItemTransfer           = "You cannot transfer more than %s items!",
     NoSerial                  = "Serial Number not set",
+    -- Backpacks
+    bag_cannot_use            = "You cannot use this bag",
+    bag_reduce_weight_switch  = "You must reduce inventory weight before switching bags",
+    bag_reduce_weight_unequip = "You must reduce inventory weight before unequipping this bag",
+    bag_cannot_remove         = "You cannot remove this bag. Inventory would be %.1f/%.1fkg.",
+    bag_cannot_unequip        = "You cannot unequip this bag. Inventory would be %.1f/%.1fkg.",
+    bag_equipped              = "%s equipped",
+    bag_unequipped            = "%s unequipped",
+    bag_prop_not_loaded       = "Bag prop model not loaded: %s",
+    bag_load_label            = "Load: %.1f/%.1f kg",
     labels                    = {
         weight = "Weight ",
         serial = "Serial no ",
@@ -390,6 +400,16 @@ Locales['tr'] = {
     noPermissionTake          = "Bu depodan bir şey alma iznin yok",
     MaxItemTransfer           = "Tek seferde %s eşyadan fazla aktaramazsın!",
     NoSerial                  = "Seri numarası ayarlanmamış",
+    -- Sırt çantaları
+    bag_cannot_use            = "Bu çantayı kullanamazsın",
+    bag_reduce_weight_switch  = "Çantayı değiştirmeden önce envanter ağırlığını azaltmalısın",
+    bag_reduce_weight_unequip = "Bu çantayı çıkarmadan önce envanter ağırlığını azaltmalısın",
+    bag_cannot_remove         = "Bu çantayı kaldıramazsın. Envanter %.1f/%.1fkg olur.",
+    bag_cannot_unequip        = "Bu çantayı çıkaramazsın. Envanter %.1f/%.1fkg olur.",
+    bag_equipped              = "%s takıldı",
+    bag_unequipped            = "%s çıkarıldı",
+    bag_prop_not_loaded       = "Çanta modeli yüklenemedi: %s",
+    bag_load_label            = "Doluluk: %.1f/%.1f kg",
     labels                    = {
         weight = "Ağırlık ",
         serial = "Seri no ",
@@ -1289,16 +1309,24 @@ end
 
 _l = (selectedLang and Locales[selectedLang]) and selectedLang or "en"
 
-function T(lang, key, ...)
-    -- Backwards compat: if first arg is the key (no second arg), treat lang as key
-    if key == nil then
-        key = lang
-        lang = _l
+function T(...)
+    -- Supports both: T("key", fmtArg, ...)  AND  T("en", "key", fmtArg, ...).
+    -- New-style only triggers when the first arg is an actual language code in
+    -- Locales AND a key follows; otherwise the call is treated as old-style so
+    -- T("key", arg) doesn't get its text swallowed.
+    local n = select('#', ...)
+    if n == 0 then return "" end
+    local args = { ... }
+    local lang, key, fmtStart
+    if n >= 2 and type(args[1]) == "string" and Locales[args[1]] then
+        lang = args[1]; key = args[2]; fmtStart = 3
+    else
+        lang = _l; key = args[1]; fmtStart = 2
     end
     local locale = Locales[lang] or Locales['en']
-    local str = locale[key] or Locales['en'][key] or key
-    if select('#', ...) > 0 and type(str) == "string" then
-        return string.format(str, ...)
+    local str = (locale and locale[key]) or (Locales['en'] and Locales['en'][key]) or key
+    if n >= fmtStart and type(str) == "string" then
+        return string.format(str, table.unpack(args, fmtStart))
     end
     return str
 end

@@ -1,7 +1,6 @@
-
--- On resource start: remove weapons from ped + disable weapon wheel
 AddEventHandler('onClientResourceStart', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
+    if Config.WeaponWheel and Config.WeaponWheel.Enabled then return end
     local ped = PlayerPedId()
     if ped and ped ~= 0 then
         RemoveAllPedWeapons(ped, true, true)
@@ -59,17 +58,10 @@ local function isControlJustPressed(controls)
     return false
 end
 
--- Hold Left Shift while pressing a hotbar slot key to holster instead of use.
--- The two ALT controls that used to be here read as permanently pressed, which
--- made every hotbar key press holster instead of using the item.
 local hotbarModifierControls = {
     0x8FFC75D6, -- INPUT_SPRINT / Left Shift
 }
 
--- Hotbar toggle. Several detection paths all feed one debounced toggle, so it
--- works no matter which input method the client supports (key mapping, raw
--- key, or the native control). The debounce stops a double-toggle when more
--- than one path fires for the same press.
 local lastHotbarToggle = 0
 local function toggleHotbar()
     if GetGameTimer() - lastHotbarToggle < 250 then return end
@@ -81,8 +73,6 @@ end
 
 RegisterCommand("vorp_toggle_hotbar", function() toggleHotbar() end, false)
 
--- Suppress native weapon-slot controls and run hotbar quick-use keys.
--- Skipped entirely when Config.WeaponWheel.Enabled = true so the native wheel works.
 CreateThread(function()
     if Config.WeaponWheel and Config.WeaponWheel.Enabled then
         print("^3[vorp_inventory]^7 Native weapon wheel enabled — hotbar quick-use shortcuts disabled.")
@@ -100,8 +90,6 @@ CreateThread(function()
         { controls = { 0xAB62E997 }, slot = 5 },
     }
 
-    -- VK_TAB = 0x09. We track the held state ourselves so we get a clean
-    -- "just pressed" edge on every press, independent of native control timing.
     local VK_TAB = 0x09
     local tabWasDown = false
 
@@ -116,8 +104,6 @@ CreateThread(function()
             end
         end
 
-        -- Manual edge detection on the raw TAB key: fire toggleHotbar() only
-        -- on the transition from up -> down, so each press flips open/close.
         local tabDownNow = IsRawKeyPressed and IsRawKeyPressed(VK_TAB)
         if tabDownNow and not tabWasDown then
             toggleHotbar()
@@ -239,7 +225,6 @@ AddEventHandler('onResourceStop', function(resourceName)
     cleanupCraftPeds()
 end)
 
--- Craft locations prompt system
 CreateThread(function()
     if not Config.CraftLocations or #Config.CraftLocations == 0 then return end
 
@@ -288,9 +273,6 @@ CreateThread(function()
 end)
 
 
-
-
--- Weapon repair prompt system
 local RepairCore = exports.vorp_core:GetCore()
 CreateThread(function()
     local durConfig = Config.WeaponDurability
@@ -328,7 +310,6 @@ CreateThread(function()
                             RepairCore.NotifyRightTip("No weapon in hand", 3000)
                             return
                         end
-                        -- Find matching weapon in UserWeapons
                         local foundId = nil
                         for id, wp in pairs(UserWeapons) do
                             if wp:getUsed() and joaat(wp:getName()) == weaponHash then
@@ -345,16 +326,12 @@ CreateThread(function()
                             RepairCore.NotifyRightTip(T("weaponFullDurability") or "This weapon doesn't need repair", 3000)
                             return
                         end
-                        -- Calculate repair time
                         local repairTime = math.floor((durConfig.MaxRepairTime or 60000) * (1 - weapon:getDurability() / 100))
-                        -- Unequip weapon
                         weapon:UnequipWeapon()
                         UserWeapons[foundId] = nil
                         NUIService.LoadInv()
-                        -- Progress bar via vorp_progressbar
                         local progressbar = exports.vorp_progressbar:initiate()
                         progressbar.start("Repairing...", repairTime, function() end, "linear", "rgb(74, 158, 107)")
-                        -- Server
                         TriggerServerEvent("vorpinventory:repairWeapon", foundId, repairTime)
                     end)
                 end
@@ -391,11 +368,9 @@ CreateThread(function()
 end)
 
 
--- Steal command: search nearest player's inventory
 local StealCore = exports.vorp_core:GetCore()
 RegisterCommand("steal", function()
     if InInventory then return end
-    -- Weapon requirement check
     if Config.StealRequiresWeapon then
         local ped = PlayerPedId()
         local _, weaponHash = GetCurrentPedWeapon(ped, false, 0, false)
@@ -477,7 +452,6 @@ if Config.DevMode then
     end, false)
 end
 
--- ENABLE PUSH TO TALK
 CreateThread(function()
     repeat Wait(5000) until LocalPlayer.state.IsInSession
     if not Config.EnablePushToTalk then

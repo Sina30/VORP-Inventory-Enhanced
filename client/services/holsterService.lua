@@ -1,20 +1,11 @@
--- =================================================================================
--- VORP INVENTORY -- WEAPON HOLSTERING (visual prop attachment)
--- Spawns and attaches a weapon prop to the player's body when the weapon is equipped
--- (selected in inventory) but not currently held in hand. Cosmetic only — does not
--- affect gameplay or ammo. Categories come from Config.WeaponCategories.
--- =================================================================================
-
 if not Config.WeaponHolstering or not Config.WeaponHolstering.Enabled then
     return
 end
 
 local cfg = Config.WeaponHolstering
 
--- [weaponId] = entityHandle for currently-attached props
 local attached = {}
 
--- Map weapon-name to category using the same prefix rules the server uses.
 local function categorize(weaponName)
     if not weaponName or not Config.WeaponCategories then return "Other" end
     for category, prefixes in pairs(Config.WeaponCategories) do
@@ -29,8 +20,6 @@ local function categorize(weaponName)
     return "Other"
 end
 
--- Resolve the prop model hash for a weapon. Prefers ModelOverrides, falls back to
--- joaat("w_" .. lower(weaponName)) which works for most RDR3 weapons.
 local function propModelFor(weaponName)
     if cfg.ModelOverrides and cfg.ModelOverrides[weaponName] then
         return joaat(cfg.ModelOverrides[weaponName])
@@ -77,9 +66,6 @@ local function attach(weaponId, weaponName)
     attached[weaponId] = prop
 end
 
--- A weapon is "holstered visible" when it's selected in inventory but the ped's
--- current held weapon is something else (i.e. ped has multiple weapons and this
--- one isn't the active one).
 local function shouldShowAsHolstered(weaponId, weaponData, currentHash)
     if not weaponData or not weaponData.getUsed then return false end
     if not weaponData:getUsed() then return false end
@@ -97,14 +83,12 @@ CreateThread(function()
         local _, currentHash = GetCurrentPedWeapon(ped, false, 0, false)
 
         if UserWeapons then
-            -- 1. Detach props for weapons that are no longer "holstered visible".
             for weaponId, _ in pairs(attached) do
                 local wp = UserWeapons[weaponId]
                 if not wp or not shouldShowAsHolstered(weaponId, wp, currentHash) then
                     detach(weaponId)
                 end
             end
-            -- 2. Attach props for newly-holstered weapons.
             for weaponId, wp in pairs(UserWeapons) do
                 if shouldShowAsHolstered(weaponId, wp, currentHash) and not attached[weaponId] then
                     attach(weaponId, wp:getName())

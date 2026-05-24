@@ -49,8 +49,6 @@ local Tables = {
             ENGINE=InnoDB;
         ]]
     },
-    -- vorp_shop_logs intentionally removed — shop events are sent to Discord via Logs.ShopWebHook
-    -- (see config/logs.lua and server/services/shopService.lua → logEvent).
 }
 
 local tries = 10

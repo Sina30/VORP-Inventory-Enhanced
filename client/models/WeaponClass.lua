@@ -74,7 +74,6 @@ local function addWeapon(weapon, slot, id)
 	local slotHash    = joaat(sHash)
 	local playerPedId = PlayerPedId()
 
-	--Now add it to the characters inventory
 	local isValid     = Citizen.InvokeNative(0x6D5D51B188333FD1, weaponHash, 0) --ItemdatabaseIsKeyValid
 	if not isValid then
 		print("Non valid weapon")
@@ -198,9 +197,6 @@ function Weapon:equipwep()
 			for ammo_name, _ in pairs(ammotypes) do
 				local qty
 				if isWeaponBow then
-					-- bows draw from the shared player arrow pool ONLY. Never
-					-- restore from the weapon's stored ammo - that value is stale
-					-- and would re-grant arrows that were already shot (dupe).
 					qty = PlayerAmmoInfo and PlayerAmmoInfo.ammo and PlayerAmmoInfo.ammo[ammo_name]
 				else
 					qty = self.ammo and self.ammo[ammo_name]
@@ -215,18 +211,11 @@ function Weapon:equipwep()
 			end
 		end
 	end
-	-- the lasso has no real ammo; give it 1 so it can be used. a bow must NOT
-	-- get a fallback - an empty bow stays empty until arrows are recovered.
 	if isLasso and ammoCount <= 0 then
 		ammoCount = 1
 	end
 
 	if isWeaponMelee or isWeaponThrowable or isWeaponBow or isWeaponPetrolCan or isLasso then
-		-- HasPedGotWeapon: re-giving a weapon whose ammo lives in a shared player pool
-		-- (bow → AMMO_ARROW, throwables, petrol can) makes the engine ADD ammoCount
-		-- to the existing pool instead of setting it. That would double the arrows
-		-- on re-equip and cap at the weapon's max — exactly the "ammo refills to 40
-		-- after rejoin/re-equip" bug. Only give the weapon if the ped doesn't have it.
 		local pedHasWeapon = Citizen.InvokeNative(0x8DECB02F88F428BC, playerPedId, weaponHash_0, 0, true)
 		if not pedHasWeapon then
 			GiveDelayedWeaponToPed(playerPedId, weaponHash_0, ammoCount, true, 0)

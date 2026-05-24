@@ -5,11 +5,11 @@ Config = {
 	EnablePushToTalk               = true, -- If true, the player can use push to talk to talk to other players while inventory is open
 
 	-- ======================= DEVELOPMENT ============================== --
-	Debug                          = false, -- If your server is live set this to false.  to true only if you are testing things
+	Debug                          = true, -- If your server is live set this to false.  to true only if you are testing things
 
 	InventoryOrder                 = "items", -- Items or weapons what should should first in inventory --- [REMOVED]
 
-	DevMode                        = false, -- If your server is live set this to false.  to true only if you are testing things (auto load inventory when script restart and before character selection. Alos add /getInv command)
+	DevMode                        = true, -- If your server is live set this to false.  to true only if you are testing things (auto load inventory when script restart and before character selection. Alos add /getInv command)
 
 	dbupdater                      = true,
 	-- ======================= CONFIGURATION ============================= --
@@ -218,15 +218,11 @@ Config = {
 	-- Use/Give buttons in the right-side column so all interactions go through
 	-- the context menu.
 	ContextMenuActions = {
-		Enabled              = false, -- show Use/Give inside the right-click context menu
-		HideRightColumnButtons = false, -- also hide the existing Use/Give buttons next to the inventory
+		Enabled              = true, -- show Use/Give inside the right-click context menu
+		HideRightColumnButtons = true, -- also hide the existing Use/Give buttons next to the inventory
 	},
 
-	-- ============================ WEAPON WHEEL ==================================
-	-- By default the inventory suppresses the native RDR3 weapon wheel (TAB) and the
-	-- 1-5 weapon-slot keys so they can be repurposed for the hotbar quick-use shortcuts.
-	-- Flip Enabled = true to keep the native wheel working — note that this disables
-	-- the hotbar quick-use shortcuts because they share the same keys.
+    -- DONOT EDIT FOR NOW
 	WeaponWheel = {
 		Enabled = false,
 	},

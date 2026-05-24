@@ -390,8 +390,6 @@ local function useWeapon(data)
 	local isLasso = weapName == `WEAPON_LASSO` or weapName == `WEAPON_LASSO_REINFORCED`
 	local hasCurrentWeapon = weaponHash and weaponHash ~= 0 and weaponHash ~= `WEAPON_UNARMED`
 	local notdual = false
-	-- Lasso is reported as a one-handed gun; exclude it from dual-wield so it
-	-- equips straight to hand instead of being holstered as an offhand weapon.
 	local canOneHandDualWield = isWeaponAGun and isWeaponOneHanded and not isLasso
 	local hasOtherDualWeapon = canOneHandDualWield and hasOtherUsedOneHandedWeapon(weaponId)
 	local hasWeapon = Citizen.InvokeNative(0x8DECB02F88F428BC, ped, weapName, 0, true)
@@ -589,7 +587,6 @@ local function loadItemsAndWeapons()
 	local items = loadItems()
 	local weapons = loadWeapons()
 
-	-- merged items with weapons
 	if Config.InventoryOrder == "items" then
 		for _, item in pairs(items) do
 			table.insert(itemsToSend, item)
@@ -809,6 +806,7 @@ function NUIService.initiateData()
 			DropInventory = Config.DropInventory or { MaxWeight = 100.0, Slots = 25 },
 			PlayerInventorySlots = Config.PlayerInventorySlots or 25,
 			ShowCharacterNameInTitle = Config.ShowCharacterNameInTitle or false,
+			ContextMenuActions = Config.ContextMenuActions or { Enabled = false },
 		}
 	})
 end

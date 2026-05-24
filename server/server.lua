@@ -31,7 +31,6 @@ local function canStackInventoryItems(firstItem, secondItem)
     return true
 end
 
--- Auto migration: slot columns
 CreateThread(function()
     local migrations = {
         { table = "character_inventories", column = "slot", sql = "ALTER TABLE character_inventories ADD COLUMN `slot` INT DEFAULT NULL;" },
@@ -56,7 +55,6 @@ AddEventHandler("syn:stopscene", function(x)
     TriggerClientEvent("inv:dropstatus", _source, x)
 end)
 
--- Register stashes from config
 CreateThread(function()
     Wait(1000)
     if not Config.Stashes then return end
@@ -217,9 +215,12 @@ Core.Callback.Register("vorpinventory:get_slots", function(source, cb, _)
     local totalItems <const>     = InventoryAPI.getUserTotalCountItems(character.identifier, character.charIdentifier)
     local totalWeapons <const>   = InventoryAPI.getUserTotalCountWeapons(character.identifier, character.charIdentifier, true)
     local totalInvWeight <const> = (totalItems + totalWeapons)
+    local effectiveSlots = (BagService and BagService.GetEffectiveCapacity and BagService.GetEffectiveCapacity(source))
+        or character.invCapacity
+    local containerWeight = (BagService and BagService.GetContainerBackpacksWeight and BagService.GetContainerBackpacksWeight(source)) or 0
     return cb({
-        totalInvWeight = totalInvWeight,
-        slots = character.invCapacity,
+        totalInvWeight = totalInvWeight + containerWeight,
+        slots = effectiveSlots,
         money = character.money,
         gold = character.gold,
         rol = character.rol,
@@ -230,7 +231,6 @@ end)
 
 RegisterServerEvent("vorp_inventory:Server:CloseCustomInventory", function()
     local _source <const> = source
-    -- here we will do a look up if this source was in any inventory
     if not INVENTORY_IN_USE[_source] then
         return print("player:", GetPlayerName(_source), "did not open inventory through the server  but it closed it meaning it opened from the client", "possible Cheat!!")
     end
@@ -245,10 +245,12 @@ RegisterServerEvent("vorp_inventory:Server:CloseCustomInventory", function()
 
     CustomInventoryInfos[id]:setInUse(false)
     INVENTORY_IN_USE[_source] = nil
+
+    if type(id) == "string" and id:sub(1, 3) == "bp_" and BagService and BagService.UpdateBagLoadMetadata then
+        BagService.UpdateBagLoadMetadata(id)
+    end
 end)
 
--- Compute repair item requirements that apply to a given weapon name.
--- Returns an array of { item, amount } that the player must hold (and that will be consumed).
 local function getRepairRequirementsFor(weaponName)
     local out = {}
     local rules = Config.WeaponDurability and Config.WeaponDurability.RepairItems
@@ -287,8 +289,6 @@ RegisterServerEvent("vorpinventory:repairWeapon", function(weaponId, repairTime)
     if not weapon or weapon:getPropietary() ~= identifier then return end
     if RepairingWeapons[_source] then return end -- already repairing
 
-    -- Require + consume repair items before accepting the job. All-or-nothing: if any
-    -- requirement is missing, the repair is aborted before the weapon is hidden.
     local requirements = getRepairRequirementsFor(weapon:getName())
     if #requirements > 0 then
         for _, req in ipairs(requirements) do
@@ -306,23 +306,19 @@ RegisterServerEvent("vorpinventory:repairWeapon", function(weaponId, repairTime)
 
     local savedSlot = weapon:getSlot()
 
-    -- Mark weapon as dropped (temporarily remove)
     RepairingWeapons[_source] = { weaponId = weaponId, slot = savedSlot, identifier = identifier, charId = charId }
     DBService.updateAsync('UPDATE loadout SET identifier = "", dropped = 1, slot = NULL WHERE id = @id', { id = weaponId })
     UsersWeapons.default[weaponId] = nil
 
     TriggerClientEvent("vorp_inventory:ReloadInv", _source)
 
-    -- Repair timer
     SetTimeout(repairTime, function()
         local repairData = RepairingWeapons[_source]
         if not repairData then return end
 
-        -- Restore weapon
         DBService.updateAsync('UPDATE loadout SET identifier = @identifier, charidentifier = @charId, dropped = 0, durability = 100, slot = @slot WHERE id = @id',
             { identifier = repairData.identifier, charId = repairData.charId, slot = repairData.slot, id = repairData.weaponId })
 
-        -- Reload weapon from DB
         local result = DBService.queryAwait('SELECT * FROM loadout WHERE id = @id', { id = repairData.weaponId })
         if result and result[1] then
             local db_weapon = result[1]
@@ -368,7 +364,6 @@ RegisterServerEvent("vorpinventory:repairWeapon", function(weaponId, repairTime)
     end)
 end)
 
--- Weapon durability sync from client
 RegisterServerEvent("vorpinventory:updateWeaponDurability", function(weaponId, durability)
     local _source = source
     local user = Core.getUser(_source)
@@ -430,7 +425,6 @@ RegisterServerEvent("vorpinventory:stealPlayer", function(targetServerId)
 
     StealTargets[_source] = targetServerId
 
-    -- Force close target's inventory if they have one open
     if targetServerId ~= _source then
         TriggerClientEvent("vorpinventory:forceCloseInventory", targetServerId)
     end
@@ -439,7 +433,6 @@ RegisterServerEvent("vorpinventory:stealPlayer", function(targetServerId)
     refreshStealInventory(_source, targetServerId)
 end)
 
--- Find free slot in inventory for an item
 local function findFreeSlotForIdentifier(identifier)
     local usedSlots = {}
     local inv = UsersInventories.default[identifier] or {}
@@ -454,7 +447,6 @@ local function findFreeSlotForIdentifier(identifier)
     return s
 end
 
--- Steal: take item from target player to source
 RegisterServerEvent("syn_search:TakeFromsteal", function(dataJson)
     local _source = source
     local data = json.decode(dataJson)
@@ -484,7 +476,6 @@ RegisterServerEvent("syn_search:TakeFromsteal", function(dataJson)
         local weapon = UsersWeapons.default[itemId]
         if not weapon or weapon:getPropietary() ~= targetIdentifier then return end
 
-        -- Force unequip on target first (clears ped + used flags)
         TriggerClientEvent("vorpInventory:removeWeapon", targetServerId, itemId)
         weapon:setUsed(false)
         weapon:setUsed2(false)
@@ -565,7 +556,6 @@ RegisterServerEvent("syn_search:TakeFromsteal", function(dataJson)
     refreshStealInventory(_source, targetServerId)
 end)
 
--- Steal: move item from source to target player
 RegisterServerEvent("syn_search:MoveTosteal", function(dataJson)
     local _source = source
     local data = json.decode(dataJson)

@@ -415,10 +415,16 @@ export const useInventoryStore = defineStore('inventory', () => {
 
   const secondCurrentCount = computed(function() {
     var total = 0
+    var weighted = !!secondWeight.value
     for (var i = 0; i < secondInventory.value.length; i++) {
-      total = total + (secondInventory.value[i].count || 1)
+      var it = secondInventory.value[i]
+      if (weighted) {
+        total = total + ((it.weight || 0) * (it.count || 1))
+      } else {
+        total = total + (it.count || 1)
+      }
     }
-    return total
+    return weighted ? parseFloat(total.toFixed(2)) : total
   })
 
   const dropCurrentWeight = computed(function() {

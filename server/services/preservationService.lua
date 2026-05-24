@@ -22,7 +22,6 @@ function PreservationService.GetWeather()
 	local cfg = Config.Preservation
 	local weatherCfg = cfg and cfg.Weather
 
-	-- 1) live weather from a sync resource (e.g. weathersync) if it is running
 	local syncRes = weatherCfg and weatherCfg.SyncResource
 	if syncRes and syncRes ~= "" and GetResourceState(syncRes) == "started" then
 		local ok, w = pcall(function() return exports[syncRes]:getWeather() end)
@@ -31,13 +30,11 @@ function PreservationService.GetWeather()
 		end
 	end
 
-	-- 2) weather pushed via exports.vorp_inventory:SetPreservationWeather(...)
 	local w = GlobalState.PreservationWeather or GlobalState.weather or GlobalState.Weather
 	if type(w) == "string" and w ~= "" then
 		return string.upper(w)
 	end
 
-	-- 3) configured default
 	return string.upper((weatherCfg and weatherCfg.DefaultWeather) or "OVERCAST")
 end
 
@@ -110,7 +107,6 @@ local function tick()
 	for invKey, invData in pairs(UsersInventories) do
 		if type(invData) == "table" then
 			if invKey == "default" then
-				-- default = { identifier = { itemId = Item } }
 				for _, identInv in pairs(invData) do
 					if type(identInv) == "table" then
 						modulateInventory(identInv, "default", dt, now, queries)
@@ -120,10 +116,8 @@ local function tick()
 				local info = CustomInventoryInfos[invKey]
 				if info then
 					if info:isShared() then
-						-- shared = { itemId = Item }
 						modulateInventory(invData, invKey, dt, now, queries)
 					else
-						-- non-shared = { identifier = { itemId = Item } }
 						for _, identInv in pairs(invData) do
 							if type(identInv) == "table" then
 								modulateInventory(identInv, invKey, dt, now, queries)
@@ -159,8 +153,6 @@ CreateThread(function()
 	end
 end)
 
--- Set the weather used by the preservation system. Call this from your
--- weathersync resource: exports.vorp_inventory:SetPreservationWeather("SNOW")
 exports("SetPreservationWeather", function(weatherName)
 	if type(weatherName) == "string" and weatherName ~= "" then
 		GlobalState.PreservationWeather = string.upper(weatherName)

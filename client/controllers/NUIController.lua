@@ -1,4 +1,3 @@
---=========================== NUI CALL BACKS  ===========================--
 RegisterNUICallback('NUIFocusOff', NUIService.NUIFocusOff)
 RegisterNUICallback('DropItem', NUIService.NUIDropItem)
 RegisterNUICallback('UseItem', NUIService.NUIUseItem)
@@ -31,8 +30,7 @@ RegisterNUICallback('DropMergeSlot', NUIService.NUIDropMergeSlot)
 RegisterNUICallback('DropSplitSlot', NUIService.NUIDropSplitSlot)
 RegisterNUICallback('PickupFromDrop', NUIService.NUIPickupFromDrop)
 
---========================================================================--
--- Reload inventory after split
+
 RegisterNetEvent("vorp_inventory:ReloadInv")
 AddEventHandler("vorp_inventory:ReloadInv", function()
 	TriggerServerEvent("vorpinventory:getInventory")
@@ -42,13 +40,10 @@ AddEventHandler("vorp_inventory:ReloadInv", function()
 	end
 end)
 
--- shared
 RegisterNetEvent("vorp_inventory:CloseInv")
 AddEventHandler("vorp_inventory:CloseInv", NUIService.CloseInv)
 
--- client
 AddEventHandler("vorp_inventory:Client:DisableInventory", NUIService.DisableInventory)
--- server
 RegisterNetEvent("vorp_inventory:ProcessingReady", NUIService.setProcessingPayFalse)
 RegisterNetEvent("vorp_inventory:OpenInv", NUIService.OpenInv)
 RegisterNetEvent("vorp_inventory:OpenCustomInv", NUIService.OpenCustomInventory)
@@ -59,8 +54,6 @@ RegisterNetEvent("vorp_inventory:transactionCompleted", NUIService.TransactionCo
 RegisterNetEvent("vorp_inventory:OpenPlayerInventory", NUIService.OpenPlayerInventory)
 RegisterNetEvent("vorp_inventory:server:CacheImages", NUIService.CacheImages)
 
--- SYN SCRIPT EVENTS
--- Store Module
 RegisterNetEvent("vorp_inventory:OpenStoreInventory")
 AddEventHandler("vorp_inventory:OpenStoreInventory", NUIService.OpenStoreInventory)
 RegisterNetEvent("vorp_inventory:ReloadStoreInventory")
@@ -68,7 +61,6 @@ AddEventHandler("vorp_inventory:ReloadStoreInventory", NUIService.ReloadInventor
 RegisterNUICallback('TakeFromStore', NUIService.NUITakeFromStore)
 RegisterNUICallback('MoveToStore', NUIService.NUIMoveToStore)
 
--- Horse Module
 RegisterNetEvent("vorp_inventory:OpenHorseInventory")
 AddEventHandler("vorp_inventory:OpenHorseInventory", NUIService.OpenHorseInventory)
 RegisterNetEvent("vorp_inventory:ReloadHorseInventory")
@@ -76,7 +68,6 @@ AddEventHandler("vorp_inventory:ReloadHorseInventory", NUIService.ReloadInventor
 RegisterNUICallback('TakeFromHorse', NUIService.NUITakeFromHorse)
 RegisterNUICallback('MoveToHorse', NUIService.NUIMoveToHorse)
 
--- Steal
 RegisterNetEvent("vorp_inventory:OpenstealInventory")
 AddEventHandler("vorp_inventory:OpenstealInventory", NUIService.OpenstealInventory)
 RegisterNetEvent("vorp_inventory:ReloadstealInventory")
@@ -100,7 +91,6 @@ RegisterNUICallback('StealSwapBetween', function(data, cb)
     cb({})
 end)
 
--- Cart Module
 RegisterNetEvent("vorp_inventory:OpenCartInventory")
 AddEventHandler("vorp_inventory:OpenCartInventory", NUIService.OpenCartInventory)
 RegisterNetEvent("vorp_inventory:ReloadCartInventory")
@@ -108,7 +98,6 @@ AddEventHandler("vorp_inventory:ReloadCartInventory", NUIService.ReloadInventory
 RegisterNUICallback('TakeFromCart', NUIService.NUITakeFromCart)
 RegisterNUICallback('MoveToCart', NUIService.NUIMoveToCart)
 
--- House Module
 RegisterNetEvent("vorp_inventory:OpenHouseInventory")
 AddEventHandler("vorp_inventory:OpenHouseInventory", NUIService.OpenHouseInventory)
 RegisterNetEvent("vorp_inventory:ReloadHouseInventory")
@@ -116,7 +105,6 @@ AddEventHandler("vorp_inventory:ReloadHouseInventory", NUIService.ReloadInventor
 RegisterNUICallback('TakeFromHouse', NUIService.NUITakeFromHouse)
 RegisterNUICallback('MoveToHouse', NUIService.NUIMoveToHouse)
 
--- Bank Module
 RegisterNetEvent("vorp_inventory:OpenBankInventory")
 AddEventHandler("vorp_inventory:OpenBankInventory", NUIService.OpenBankInventory)
 RegisterNetEvent("vorp_inventory:ReloadBankInventory")
@@ -124,7 +112,6 @@ AddEventHandler("vorp_inventory:ReloadBankInventory", NUIService.ReloadInventory
 RegisterNUICallback('TakeFromBank', NUIService.NUITakeFromBank)
 RegisterNUICallback('MoveToBank', NUIService.NUIMoveToBank)
 
---Hideout Module
 RegisterNetEvent("vorp_inventory:OpenHideoutInventory")
 AddEventHandler("vorp_inventory:OpenHideoutInventory", NUIService.OpenHideoutInventory)
 
@@ -133,7 +120,6 @@ AddEventHandler("vorp_inventory:ReloadHideoutInventory", NUIService.ReloadInvent
 RegisterNUICallback("TakeFromHideout", NUIService.NUITakeFromHideout)
 RegisterNUICallback("MoveToHideout", NUIService.NUIMoveToHideout)
 
--- Clan Module
 RegisterNetEvent("vorp_inventory:OpenClanInventory")
 AddEventHandler("vorp_inventory:OpenClanInventory", NUIService.OpenClanInventory)
 RegisterNetEvent("vorp_inventory:ReloadClanInventory")
@@ -141,7 +127,6 @@ AddEventHandler("vorp_inventory:ReloadClanInventory", NUIService.ReloadInventory
 RegisterNUICallback("TakeFromClan", NUIService.NUITakeFromClan)
 RegisterNUICallback("MoveToClan", NUIService.NUIMoveToClan)
 
--- Container Module
 RegisterNetEvent("vorp_inventory:OpenContainerInventory")
 AddEventHandler("vorp_inventory:OpenContainerInventory", NUIService.OpenContainerInventory)
 RegisterNetEvent("vorp_inventory:ReloadContainerInventory")

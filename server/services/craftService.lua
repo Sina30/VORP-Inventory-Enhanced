@@ -299,7 +299,6 @@ AddEventHandler("vorpinventory:startCraft", function(rewardName, craftAmount)
 
     local slots = getPlayerCraftSlots(charId)
 
-    -- Verify all ingredients for craftAmount
     for _, req in ipairs(recipe.requiredItems) do
         local found = 0
         for _, item in pairs(slots) do
@@ -310,12 +309,9 @@ AddEventHandler("vorpinventory:startCraft", function(rewardName, craftAmount)
 
     local totalTimer = recipe.timerForPerAmount * craftAmount
 
-    -- Notify crafting started
     TriggerClientEvent("vorpInventory:craftStarted", src, totalTimer)
 
-    -- Timer
     SetTimeout(totalTimer, function()
-        -- Remove ingredients (multiplied by craftAmount)
         for _, req in ipairs(recipe.requiredItems) do
             local remaining = req.requiredAmount * craftAmount
             local reqSvItem = ServerItems[req.name]
@@ -327,11 +323,9 @@ AddEventHandler("vorpinventory:startCraft", function(rewardName, craftAmount)
                     if item.count <= 0 then slots[slotKey] = nil end
                 end
             end
-            -- Notification for removed ingredient
             TriggerClientEvent("vorpInventory:itemNotify", src, "remove", req.name, reqSvItem and reqSvItem:getLabel() or req.name, req.requiredAmount * craftAmount)
         end
 
-        -- Give reward
         local svItem = ServerItems[rewardName]
         local totalReward = recipe.rewardAmount * craftAmount
         if svItem then

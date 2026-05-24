@@ -105,8 +105,6 @@ local function removeFromDropLocation(uid)
 			for i, storedUid in ipairs(slotData.uids) do
 				if storedUid == uid then
 					table.remove(slotData.uids, i)
-					-- Reduce amount proportionally (1 uid = 1 drop action)
-					-- But amount tracks total items, not uids. Remove the slot if no uids left.
 					if #slotData.uids == 0 then
 						loc.slots[slotNum] = nil
 					end
@@ -1084,13 +1082,9 @@ function InventoryService.addItem(source, invId, name, amount, metadata, data, c
 		return cb(item)
 	end
 
-	-- item exists in inventory by name and metadata?
 	local item <const> = SvUtils.FindItemByNameAndMetadata(invId, identifier, name, metadata)
 	if item then
-		-- items exists with the same name and metadata
-		-- amount is greater than 0 for error
 		if amount > 0 then
-			-- if item is not a degradation item
 			if svItem:getMaxDegradation() == 0 then
 				local success = item:addCount(amount, CustomInventoryInfos[invId].ignoreItemStackLimit)
 				if not success then
@@ -1099,8 +1093,6 @@ function InventoryService.addItem(source, invId, name, amount, metadata, data, c
 				DBService.SetItemAmount(item:getOwner(), item:getId(), item:getCount())
 				return cb(item)
 			else
-				-- if item is degradation item
-				-- if is the correct item with the same values increase amount
 				if item:getPercentage() == data.percentage then
 					local success = item:addCount(amount, CustomInventoryInfos[invId].ignoreItemStackLimit)
 					if not success then
@@ -1110,14 +1102,11 @@ function InventoryService.addItem(source, invId, name, amount, metadata, data, c
 					return cb(item)
 				end
 			end
-			-- create new item
 			return createItem()
 		end
-		-- error
 		print("DUPE DEBUG 4: addItem returning nil - amount <= 0 for item: " .. name)
 		return cb(nil)
 	end
-	-- item does not exist in inventory, or metadata is different create new item
 	return createItem()
 end
 

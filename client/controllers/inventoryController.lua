@@ -33,6 +33,5 @@ RegisterNetEvent("vorpinventory:forceCloseInventory", function()
 	end
 end)
 
---shared
 RegisterNetEvent("vorp:SelectedCharacter")
 AddEventHandler("vorp:SelectedCharacter", InventoryService.onSelectedCharacter)

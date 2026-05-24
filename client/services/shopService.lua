@@ -13,7 +13,7 @@ local Core <const> = exports.vorp_core:GetCore()
 
 local function cleanupShop(id)
     local ped = ShopClient.peds[id]
-    if ped and DoesEntityExist(ped) then
+    if type(ped) == "number" and DoesEntityExist(ped) then
         DeleteEntity(ped)
         SetEntityAsNoLongerNeeded(ped)
     end
@@ -33,24 +33,41 @@ end
 local function spawnPedIfNeeded(shop)
     if not Shops.Features.NpcPed then return end
     if not shop.ped or not shop.ped.model then return end
-    if ShopClient.peds[shop.id] and DoesEntityExist(ShopClient.peds[shop.id]) then return end
 
-    local hash = type(shop.ped.model) == "string" and joaat(shop.ped.model) or shop.ped.model
-    RequestModel(hash)
-    local tries = 0
-    while not HasModelLoaded(hash) and tries < 50 do
-        Wait(50); tries = tries + 1
-    end
-    if not HasModelLoaded(hash) then return end
+    local status = ShopClient.peds[shop.id]
+    if status == "loading" or status == "failed" then return end
+    if type(status) == "number" and DoesEntityExist(status) then return end
 
-    local ped = CreatePed(hash, shop.coord.x, shop.coord.y, shop.coord.z - 1.0, shop.ped.heading or 0.0, false, false, false, false)
-    SetEntityCanBeDamaged(ped, false)
-    SetPedCanBeTargetted(ped, false)
-    SetEntityInvincible(ped, true)
-    SetBlockingOfNonTemporaryEvents(ped, true)
-    FreezeEntityPosition(ped, true)
-    SetModelAsNoLongerNeeded(hash)
-    ShopClient.peds[shop.id] = ped
+    ShopClient.peds[shop.id] = "loading"
+
+    CreateThread(function()
+        local hash = type(shop.ped.model) == "string" and joaat(shop.ped.model) or shop.ped.model
+        if not IsModelValid(hash) then
+            print(("^3[vorp_inventory]^7 shop ped model is not valid: %s (%s)"):format(tostring(shop.ped.model), shop.id))
+            ShopClient.peds[shop.id] = "failed"
+            return
+        end
+
+        RequestModel(hash)
+        local tries = 0
+        while not HasModelLoaded(hash) and tries < 50 do
+            Wait(50); tries = tries + 1
+        end
+        if not HasModelLoaded(hash) then
+            print(("^3[vorp_inventory]^7 shop ped model failed to load: %s (%s)"):format(tostring(shop.ped.model), shop.id))
+            ShopClient.peds[shop.id] = "failed"
+            return
+        end
+
+        local ped = CreatePed(hash, shop.coord.x, shop.coord.y, shop.coord.z - 1.0, shop.ped.heading or 0.0, false, false, false, false)
+        SetEntityCanBeDamaged(ped, false)
+        SetPedCanBeTargetted(ped, false)
+        SetEntityInvincible(ped, true)
+        SetBlockingOfNonTemporaryEvents(ped, true)
+        FreezeEntityPosition(ped, true)
+        SetModelAsNoLongerNeeded(hash)
+        ShopClient.peds[shop.id] = ped
+    end)
 end
 
 local function spawnBlipIfNeeded(shop)
@@ -124,14 +141,13 @@ CreateThread(function()
                         if InInventory then break end
                         if (GetGameTimer() - lastTriggered) < 1500 then break end
 
-                        if UiPromptHasStandardModeCompleted(browsePrompt, 0) then
+                        if IsControlJustPressed(0, 0xCEFD9220) then -- E -> browse
                             lastTriggered = GetGameTimer()
                             TriggerServerEvent("vorp_inventory:Shop:Open", shop.id)
                         elseif shop.purchasable and not shop.owned and UiPromptHasHoldModeCompleted(purchasePrompt) then
                             lastTriggered = GetGameTimer()
                             TriggerServerEvent("vorp_inventory:Shop:Purchase", shop.id)
-                        elseif shop.owned and UiPromptHasStandardModeCompleted(managePrompt, 0) then
-                            -- "Manage" is just an alias for Open — server decides role/permissions.
+                        elseif shop.owned and IsControlJustPressed(0, 0x771AF4D5) then -- H -> manage
                             lastTriggered = GetGameTimer()
                             TriggerServerEvent("vorp_inventory:Shop:Open", shop.id)
                         end
@@ -172,6 +188,9 @@ function ShopClient.Refresh(payload)
         action = "setShopState",
         shop   = payload,
     })
+    if NUIService and NUIService.LoadInv then
+        NUIService.LoadInv()
+    end
 end
 
 function ShopClient.CloseUI()

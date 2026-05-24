@@ -312,6 +312,19 @@
       dragGhost.value.show = false
       return
     }
+    // Shop → Player (buy). Quantity from the amount input; 0/blank => 1.
+    if (dragSource.value === 'shop') {
+      var shopItem = shopItemAt(dragFrom.value)
+      if (shopItem && inventory.shopId && shopItem.buy_price > 0) {
+        var qty = getShopBuyQty()
+        postNUI('ShopBuy', { shopId: inventory.shopId, item: shopItem.name, qty: qty })
+        playPopSound()
+      }
+      dragFrom.value = null
+      dragSource.value = null
+      dragGhost.value.show = false
+      return
+    }
     if (dragFrom.value !== toSlot) {
       var fromItem = inventory.getItemAtSlot(dragFrom.value)
       var amount = fromItem ? getTransferAmount(fromItem) : 0
@@ -535,7 +548,7 @@
     contextMenu.value.show = false
   }
 
-  const reservedMetaKeys = ['label', 'description', 'image', 'weight', 'tooltip', 'context', 'orgdescription', 'lumberdurability']
+  const reservedMetaKeys = ['label', 'description', 'image', 'weight', 'tooltip', 'context', 'orgdescription', 'lumberdurability', 'bagId', 'equipped']
 
   function isReservedMeta(key) {
     return reservedMetaKeys.indexOf(key) !== -1
@@ -766,17 +779,28 @@
     return null
   }
 
-  function onShopSlotClick(slot, e) {
-    var item = shopItemAt(slot); if (!item) return
-    if (!inventory.shopId) return
-    // Shift-click → buy 5, Ctrl-click → buy 10, otherwise 1.
-    var qty = 1
-    if (e && e.shiftKey) qty = 5
-    if (e && (e.ctrlKey || e.metaKey)) qty = 10
-    if (item.buy_price > 0) {
-      postNUI('ShopBuy', { shopId: inventory.shopId, item: item.name, qty: qty })
-      playPopSound()
-    }
+  // Drag a shop slot to your player inventory to buy. Quantity comes from the
+  // amount input between the two panels; if it is 0/blank, default to 1.
+  function onShopSlotMouseDown(e, slotIndex) {
+    var item = shopItemAt(slotIndex)
+    if (!item) return
+    if (e.button !== 0) return
+    e.preventDefault()
+    dragStartPos = { x: e.clientX, y: e.clientY, slot: slotIndex, item: item, source: 'shop' }
+    dragTimer = setTimeout(function() {
+      if (dragStartPos) {
+        dragFrom.value = dragStartPos.slot
+        dragSource.value = dragStartPos.source
+        dragGhost.value = { show: true, x: dragStartPos.x, y: dragStartPos.y, item: dragStartPos.item }
+        dragStartPos = null
+      }
+    }, 150)
+  }
+
+  function getShopBuyQty() {
+    var qty = Number(transferAmount.value)
+    if (!qty || qty <= 0) qty = 1
+    return Math.max(1, Math.floor(qty))
   }
 
   function onPurchaseShop() {
@@ -1106,10 +1130,11 @@
                   <!-- 5xN shop slot grid (mirrors secondary inventory grid exactly) -->
                   <div class="w-full flex-1 grid grid-cols-5 gap-1.5 content-start overflow-y-auto">
                     <div v-for="i in (inventory.shopState?.capacity || 35)" :key="'shop-slot-'+i"
-                         @click="onShopSlotClick(i, $event)"
-                         class="aspect-square bg-white/[0.08] rounded transition-all hover:opacity-70 p-1 relative flex flex-col items-center justify-center cursor-pointer">
+                         @mousedown="onShopSlotMouseDown($event, i)"
+                         class="aspect-square bg-white/[0.08] rounded transition-all hover:opacity-70 p-1 relative flex flex-col items-center justify-center cursor-pointer"
+                         :class="{ 'opacity-30': dragFrom === i && dragSource === 'shop' }">
                       <template v-if="shopItemAt(i)">
-                        <span class="absolute top-0.5 right-1 text-[10px] text-white/70">{{ shopItemAt(i).infinite ? '∞' : shopItemAt(i).count }}</span>
+                        <span class="absolute top-0.5 right-1 text-sm font-bold text-white" style="text-shadow: 0 1px 2px rgba(0,0,0,0.7);">{{ shopItemAt(i).infinite ? '∞' : shopItemAt(i).count }}</span>
                         <div class="absolute top-0.5 left-1 flex flex-col items-start leading-none">
                           <span class="text-[10px] text-[#e6c074] font-semibold">${{ shopItemAt(i).buy_price }}</span>
                           <span v-if="shopItemAt(i).sell_price > 0 && inventory.shopState?.buyback" class="text-[8px] text-[#b8d49f] mt-px">▾${{ shopItemAt(i).sell_price }}</span>

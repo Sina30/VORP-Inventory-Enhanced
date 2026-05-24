@@ -2,8 +2,6 @@ local Core <const> = exports.vorp_core:GetCore()
 
 ShopService = {}
 
--- In-memory cache: [shopId] = { def, row, stock, employees, currentViewer }
--- NOTE: do NOT name this `Shops` — that's the global config table from config/shops.lua.
 local ShopCache  = {}
 local ViewerShop = {} -- [source] = shopId (set while a player has a shop UI open)
 
@@ -47,6 +45,14 @@ local function hasPerm(shop, charid, mask)
     return (perms & mask) == mask
 end
 
+local function getInGameHour()
+    if GetResourceState("weathersync") == "started" then
+        local ok, t = pcall(function() return exports.weathersync:getTime() end)
+        if ok and t and t.hour then return tonumber(t.hour) or 12 end
+    end
+    return tonumber(os.date("%H")) or 12
+end
+
 local function isShopOpen(shop)
     if not isFeatureOn("OpeningHours") then return true end
     local def = shop.def
@@ -57,7 +63,7 @@ local function isShopOpen(shop)
     if not enforce then return true end
     local openH  = (shop.row and shop.row.open_hour) or defOrDefault(def, "openHour")
     local closeH = (shop.row and shop.row.close_hour) or defOrDefault(def, "closeHour")
-    local hour = tonumber(GetClockHours()) or 12
+    local hour = getInGameHour()
     if openH == closeH then return true end
     if openH < closeH then
         return hour >= openH and hour < closeH
@@ -66,7 +72,6 @@ local function isShopOpen(shop)
     end
 end
 
--- Pick the right color from Logs.ShopWebHook for a given event kind.
 local function colorForKind(kind)
     local hook = Logs and Logs.ShopWebHook
     if not hook then return 0 end
@@ -87,7 +92,6 @@ local function colorForKind(kind)
     return map[kind] or 0
 end
 
--- Resolve a charid → "First Last" + Steam name for embed descriptions.
 local function describeActor(src, charid)
     if src and tonumber(src) > 0 then
         local user = Core.getUser(src)
@@ -103,9 +107,6 @@ local function describeActor(src, charid)
     return "Unknown", "n/a"
 end
 
--- Discord webhook dispatcher. Replaces the old DB log writer.
--- kind ∈ buy|sell|restock|wd_stock|withdraw|purchase|assign|employee|reset|price|hours|forced
--- payload : free-form table with extra fields (item, qty, price, target, perms, ...)
 local function logEvent(shopId, kind, src, charid, payload)
     if not isFeatureOn("TransactionLog") then return end
     local hook = Logs and Logs.ShopWebHook
@@ -116,11 +117,9 @@ local function logEvent(shopId, kind, src, charid, payload)
     local actor, steam = describeActor(src, charid)
     payload = payload or {}
 
-    -- Locale lookups (shop_log_* + WebHookLang). Fall back to config TitleFallback / English.
     local lang = (T("WebHookLang") and type(T("WebHookLang")) == "table") and T("WebHookLang") or {}
     local title = (lang["shop_" .. kind]) or (hook.TitleFallback and hook.TitleFallback[kind]) or ("Shop Event: " .. kind)
 
-    -- Build description as a small key:value markdown block. All labels go through the locale.
     local lines = {
         string.format("**%s:** `%s` (`%s`)", lang.shop_shop or "Shop", shopName, shopId),
         string.format("**%s:** `%s` — `%s`", lang.charname or "Player", actor, steam ~= "n/a" and steam or ""),
@@ -170,6 +169,18 @@ local function loadShop(def)
     for _, r in ipairs(stockRows) do
         stock[r.item] = { qty = tonumber(r.qty) or 0, buy_price = tonumber(r.buy_price) or 0, sell_price = tonumber(r.sell_price) or 0 }
     end
+
+    local configItems = {}
+    if def.stock then
+        for _, s in ipairs(def.stock) do configItems[s.item] = true end
+    end
+    for itemName in pairs(stock) do
+        if not configItems[itemName] then
+            MySQL.update.await("DELETE FROM vorp_shop_stock WHERE shop_id=@s AND item=@i;", { s = def.id, i = itemName })
+            stock[itemName] = nil
+        end
+    end
+
     if def.stock then
         for _, s in ipairs(def.stock) do
             if not stock[s.item] then
@@ -182,7 +193,20 @@ local function loadShop(def)
         end
     end
 
-    -- Employee perms
+    if def.type == "npc" and def.stock then
+        for _, s in ipairs(def.stock) do
+            local entry = stock[s.item]
+            local cfgBuy  = tonumber(s.price) or 0
+            local cfgSell = tonumber(s.sellPrice) or 0
+            if entry and (entry.buy_price ~= cfgBuy or entry.sell_price ~= cfgSell) then
+                entry.buy_price  = cfgBuy
+                entry.sell_price = cfgSell
+                MySQL.update.await("UPDATE vorp_shop_stock SET buy_price=@b, sell_price=@l WHERE shop_id=@s AND item=@i;",
+                    { b = cfgBuy, l = cfgSell, s = def.id, i = s.item })
+            end
+        end
+    end
+
     local empRows = MySQL.query.await("SELECT charid, perms FROM vorp_shop_employees WHERE shop_id=@id;", { id = def.id }) or {}
     local employees = {}
     for _, e in ipairs(empRows) do
@@ -224,7 +248,7 @@ local function buildItemListForUI(shop)
         for _, s in ipairs(shop.def.stock) do
             local entry = shop.stock[s.item]
             if entry then
-                local itemRow = exports.vorp_inventory:getDBItem(0, s.item) or {}
+                local itemRow = ServerItems[s.item] or {}
                 table.insert(list, {
                     name       = s.item,
                     label      = itemRow.label or s.item,
@@ -247,7 +271,7 @@ local function buildItemListForUI(shop)
     end
     for item, entry in pairs(shop.stock) do
         if not seen[item] then
-            local itemRow = exports.vorp_inventory:getDBItem(0, item) or {}
+            local itemRow = ServerItems[item] or {}
             table.insert(list, {
                 name       = item,
                 label      = itemRow.label or item,
@@ -325,7 +349,6 @@ function ShopService.Open(src, shopId)
     local char = getChar(src); if not char then return end
     local charid = char.charIdentifier
 
-    -- Job gating only relevant to NPC shops
     if shop.def.type == "npc" and shop.def.jobs and shop.def.jobs ~= "all" then
         local ok = false
         for _, j in ipairs(shop.def.jobs) do if j == char.job then ok = true break end end
@@ -367,7 +390,7 @@ function ShopService.Buy(src, shopId, itemName, qty)
     local char = getChar(src); if not char then return end
     qty = math.max(1, math.floor(tonumber(qty) or 1))
 
-    if shopRole(shop, char.charIdentifier) == "customer" and not isShopOpen(shop) then
+    if shopRole(shop, char.charIdentifier) ~= "owner" and not isShopOpen(shop) then
         return notify(src, T("shop_closed"))
     end
 
@@ -417,7 +440,7 @@ function ShopService.Sell(src, shopId, itemName, qty)
     local char = getChar(src); if not char then return end
     qty = math.max(1, math.floor(tonumber(qty) or 1))
 
-    if shopRole(shop, char.charIdentifier) == "customer" and not isShopOpen(shop) then
+    if shopRole(shop, char.charIdentifier) ~= "owner" and not isShopOpen(shop) then
         return notify(src, T("shop_closed"))
     end
 
@@ -528,7 +551,6 @@ function ShopService.SetPrice(src, shopId, itemName, buyPrice, sellPrice)
     refresh(src, shop, char.charIdentifier)
 end
 
--- ---------- WITHDRAW MONEY ----------
 function ShopService.WithdrawBalance(src, shopId, amount)
     local shop = ShopCache[shopId]; if not shop then return end
     if ViewerShop[src] ~= shopId then return end
@@ -620,19 +642,21 @@ function ShopService.PurchaseShop(src, shopId)
     logEvent(shopId, "purchase", src, char.charIdentifier, { price = price })
     notify(src, T("shop_now_owner", shop.def.name), 4000)
     TriggerClientEvent("vorp_inventory:Shop:OwnershipChanged", -1, shopId, char.charIdentifier)
+
+    if ViewerShop[src] == shopId then
+        refresh(src, shop, char.charIdentifier)
+    end
 end
 
 function ShopService.AdminSetOwner(src, shopId, targetCharId)
     local shop = ShopCache[shopId]; if not shop then return notify(src, T("shop_notfound")) end
     targetCharId = tonumber(targetCharId)
     if targetCharId == nil or targetCharId <= 0 then
-        -- clear ownership
         MySQL.update.await("UPDATE vorp_shops SET owner_identifier=NULL, owner_charid=NULL WHERE id=@s;", { s = shopId })
         shop.row.owner_identifier = nil
         shop.row.owner_charid     = nil
         notify(src, T("shop_owner_cleared", shopId), 3000)
     else
-        -- look up identifier via VORP characters table
         local row = MySQL.single.await("SELECT identifier FROM characters WHERE charidentifier=@c;", { c = targetCharId })
         if not row then return notify(src, T("shop_character_not_found")) end
         MySQL.update.await("UPDATE vorp_shops SET owner_identifier=@id, owner_charid=@c WHERE id=@s;", { id = row.identifier, c = targetCharId, s = shopId })

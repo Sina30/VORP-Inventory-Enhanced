@@ -76,7 +76,7 @@ Shops.List = {
         coord           = vector3(-323.13, 811.27, 116.42),
         purchasePrice   = 7500,
         ped = {
-            model   = "s_m_m_uniexposito_01",
+            model   = "U_M_M_NbxGeneralStoreOwner_01",
             heading = 28.0,
         },
         blip = { enabled = true, sprite = -776993475, scale = 0.2, name = "General Store" },
@@ -84,9 +84,9 @@ Shops.List = {
         closeHour = 21,
         -- Items + default prices (seed stock if shop has no rows in DB yet)
         stock = {
-            { item = "consumable_apple",         price = 2,  sellPrice = 1,  stock = 25 },
-            { item = "consumable_bread",         price = 4,  sellPrice = 2,  stock = 20 },
-            { item = "consumable_raspberrywater",price = 6,  sellPrice = 3,  stock = 15 },
+            { item = "banana",         price = 2,  sellPrice = 1,  stock = 25 },
+            { item = "carrots",         price = 4,  sellPrice = 2,  stock = 20 },
+            { item = "cheesecake",price = 6,  sellPrice = 3,  stock = 15 },
         },
     },
 
@@ -104,8 +104,8 @@ Shops.List = {
         closeHour = 20,
         buyback   = true,
         stock = {
-            { item = "consumable_meat",          price = 8,  sellPrice = 5 },
-            { item = "consumable_saltedmeat",    price = 12, sellPrice = 7 },
+            { item = "chickenf",          price = 8,  sellPrice = 5 },
+            { item = "chickenheart",    price = 12, sellPrice = 7 },
         },
     },
 
@@ -122,8 +122,8 @@ Shops.List = {
         enforceHours = false,
         stock = {
             -- prices balanced to be exorbitant — adjust to your economy
-            { item = "ammorevolvernormal", price = 3,  sellPrice = 0 },
-            { item = "ammorifleexpress",   price = 4,  sellPrice = 0 },
+            { item = "cigar", price = 3,  sellPrice = 0 },
+            { item = "ammopistolexplosive",   price = 4,  sellPrice = 0 },
         },
     },
 }

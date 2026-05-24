@@ -1,4 +1,3 @@
--- InventoryApiController server to client events
 RegisterNetEvent("vorpCoreClient:addItem", InventoryApiService.addItem)
 RegisterNetEvent("vorpCoreClient:subItem", InventoryApiService.subItem)
 RegisterNetEvent("vorpCoreClient:subWeapon", InventoryApiService.subWeapon)

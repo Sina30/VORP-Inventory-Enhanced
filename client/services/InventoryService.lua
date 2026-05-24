@@ -18,6 +18,17 @@ function findNextFreeSlot()
 	return slot
 end
 
+
+local function giveWeaponToPedForWheel(weaponName, ammoTotal)
+	if not Config.WeaponWheel or not Config.WeaponWheel.Enabled then return end
+	if not weaponName or weaponName == "" then return end
+	local ped = PlayerPedId()
+	if not ped or ped == 0 then return end
+	local hash = joaat(weaponName)
+	if Citizen.InvokeNative(0x8DECB02F88F428BC, ped, hash, 0, true) then return end
+	GiveWeaponToPed(ped, hash, ammoTotal or 0, true, false)
+end
+
 function InventoryService.receiveItem(name, id, amount, metadata, degradation, percentage)
 	if not name or not ClientItems[name] then return end
 
@@ -91,6 +102,7 @@ function InventoryService.receiveWeapon(id, propietary, name, ammos, label, seri
 			durability = durability or 100,
 		})
 		UserWeapons[newWeapon:getId()] = newWeapon
+		giveWeaponToPedForWheel(name, ammo_total)
 		NUIService.LoadInv()
 	end
 end
@@ -135,14 +147,11 @@ function InventoryService.processItems(items)
 	end
 end
 
--- Load inventory weapons on client start
 function InventoryService.getLoadout(loadout)
-	-- Build set of IDs from new loadout
 	local newIds = {}
 	for _, weapon in ipairs(loadout) do
 		newIds[tonumber(weapon.id)] = true
 	end
-	-- Remove weapons no longer in loadout (e.g. transferred to another player)
 	for id, wp in pairs(UserWeapons) do
 		if not newIds[id] then
 			if wp.getUsed and (wp:getUsed() or wp:getUsed2()) then
@@ -184,6 +193,7 @@ function InventoryService.getLoadout(loadout)
 				existingWeapon:setAmmoTotal(weapon.ammo_total or 0)
 				existingWeapon:setDurability(weapon.durability or 100)
 				existingWeapon.comps = weapon.comps or {}
+				giveWeaponToPedForWheel(weapon.name, weapon.ammo_total)
 			else
 				local newWeapon = Weapon:New({
 					id = weaponId,
@@ -208,6 +218,7 @@ function InventoryService.getLoadout(loadout)
 					comps = weapon.comps or {}
 				})
 				UserWeapons[newWeapon:getId()] = newWeapon
+				giveWeaponToPedForWheel(weapon.name, weapon.ammo_total)
 
 				if not loadoutInitialized and newWeapon:getUsed() then
 					Utils.useWeapon(newWeapon:getId())

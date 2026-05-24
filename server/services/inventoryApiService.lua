@@ -1984,6 +1984,9 @@ function InventoryAPI.openInventory(source, id)
 	local weight = nil
 	if CustomInventoryInfos[id]:useWeight() then
 		weight = CustomInventoryInfos[id]:getWeight() > 0 and tostring(CustomInventoryInfos[id]:getWeight())
+		-- For weight-limited inventories, surface the kg cap as the capacity so the UI
+		-- shows "<currentKg>/<maxKg>kg" instead of "0/ookg".
+		if weight then capacity = weight end
 	end
 
 	local function createCharacterInventoryFromDB(inventory)
