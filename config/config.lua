@@ -5,11 +5,11 @@ Config = {
 	EnablePushToTalk               = true, -- If true, the player can use push to talk to talk to other players while inventory is open
 
 	-- ======================= DEVELOPMENT ============================== --
-	Debug                          = true, -- If your server is live set this to false.  to true only if you are testing things
+	Debug                          = false, -- If your server is live set this to false.  to true only if you are testing things
 
 	InventoryOrder                 = "items", -- Items or weapons what should should first in inventory --- [REMOVED]
 
-	DevMode                        = true, -- If your server is live set this to false.  to true only if you are testing things (auto load inventory when script restart and before character selection. Alos add /getInv command)
+	DevMode                        = false, -- If your server is live set this to false.  to true only if you are testing things (auto load inventory when script restart and before character selection. Alos add /getInv command)
 
 	dbupdater                      = true,
 	-- ======================= CONFIGURATION ============================= --
